@@ -1,0 +1,480 @@
+from flask import Flask, request, jsonify, session, send_from_directory
+from flask_cors import CORS
+import sqlite3, hashlib, os, time
+from datetime import timedelta
+
+app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = 'wwiii_forum_secret_2026_x9k'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+CORS(app, supports_credentials=True, origins='*', supports_credentials=True)
+
+DB = os.path.join(os.path.dirname(__file__), 'forum.db')
+
+# ---------- DB ----------
+def get_db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
+    c.executescript('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        created_at INTEGER DEFAULT 0,
+        banned INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS topics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        author_id INTEGER,
+        created_at INTEGER DEFAULT 0,
+        pinned INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        topic_id INTEGER NOT NULL,
+        author_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        reply_to INTEGER DEFAULT NULL,
+        created_at INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS security_answers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL
+    );
+    ''')
+
+    c.execute('SELECT COUNT(*) FROM security_answers')
+    if c.fetchone()[0] == 0:
+        c.execute("INSERT INTO security_answers(question,answer) VALUES(?,?)",
+                  ('世界上最伟大的动物是什么？', '猫'))
+
+    c.execute('SELECT COUNT(*) FROM users WHERE role="admin"')
+    if c.fetchone()[0] == 0:
+        pwd = hashlib.sha256('admin888'.encode()).hexdigest()
+        c.execute("INSERT INTO users(username,password,role,created_at) VALUES(?,?,?,?)",
+                  ('admin', pwd, 'admin', int(time.time())))
+
+    c.execute('SELECT COUNT(*) FROM topics')
+    if c.fetchone()[0] == 0:
+        now = int(time.time())
+        default_topics = [
+            ('豆腐脑吃甜的还是咸的？', '甜党 vs 咸党，千年论战，今日终结！'),
+            ('腐乳就该是辣的', '不加辣椒的腐乳，是对腐乳的侮辱。'),
+            ('粽子到底是甜的好吃还是咸的？', '肉粽党和甜粽党请各自发表意见！'),
+            ('汤圆里应该有馅还是没馅？', '无馅汤圆是什么？一个球吗？'),
+            ('火锅蘸料：芝麻酱还是油碟？', '两种蘸料，两种人生，你站哪队？'),
+            ('方便面汤要不要喝？', '倒掉汤是一种罪过！'),
+            ('榴莲：天堂还是地狱？', '榴莲爱好者和厌恶者的终极对决。'),
+            ('螺蛳粉臭还是香？', '那股味道，是灵魂还是折磨？'),
+            ('月饼蛋黄是异端吗？', '蛋黄月饼爱好者请进来辩论。'),
+            ('早餐该吃咸还是甜？', '豆浆油条 vs 牛奶面包，中西之争。'),
+        ]
+        for title, desc in default_topics:
+            c.execute('INSERT INTO topics(title,description,author_id,created_at,pinned) VALUES(?,?,?,?,?)',
+                      (title, desc, 1, now, 0))
+
+    conn.commit()
+    conn.close()
+
+def hash_pwd(pwd):
+    return hashlib.sha256(pwd.encode()).hexdigest()
+
+def login_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'ok': False, 'msg': '请先登录'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if session.get('role') != 'admin':
+            return jsonify({'ok': False, 'msg': '无权限'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+# ---------- 静态页面 ----------
+@app.route('/')
+def index():
+    return send_from_directory('templates', 'index.html')
+
+@app.route('/login')
+def login_page():
+    return send_from_directory('templates', 'login.html')
+
+@app.route('/register')
+def register_page():
+    return send_from_directory('templates', 'register.html')
+
+@app.route('/topic/<int:tid>')
+def topic_page(tid):
+    return send_from_directory('templates', 'topic.html')
+
+@app.route('/admin')
+def admin_page():
+    return send_from_directory('templates', 'admin.html')
+
+@app.route('/user/<int:uid>')
+def user_profile_page(uid):
+    return send_from_directory('templates', 'profile.html')
+
+# ---------- API 认证 ----------
+@app.route('/api/security_question', methods=['GET'])
+def get_security_question():
+    conn = get_db()
+    row = conn.execute('SELECT question FROM security_answers LIMIT 1').fetchone()
+    conn.close()
+    return jsonify({'question': row['question'] if row else ''})
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    answer = data.get('answer', '').strip()
+    if not username or not password or not answer:
+        return jsonify({'ok': False, 'msg': '请填写所有字段'}), 400
+    if len(username) < 2 or len(username) > 16:
+        return jsonify({'ok': False, 'msg': '用户名需2-16个字符'}), 400
+    if len(password) < 6:
+        return jsonify({'ok': False, 'msg': '密码至少6个字符'}), 400
+    conn = get_db()
+    row = conn.execute('SELECT answer FROM security_answers LIMIT 1').fetchone()
+    if not row or answer.lower() != row['answer'].lower():
+        conn.close()
+        return jsonify({'ok': False, 'msg': '安全问题回答错误'}), 400
+    try:
+        conn.execute('INSERT INTO users(username,password,created_at) VALUES(?,?,?)',
+                     (username, hash_pwd(password), int(time.time())))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '用户名已存在'}), 400
+    conn.close()
+    return jsonify({'ok': True, 'msg': '注册成功'})
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    if not username or not password:
+        return jsonify({'ok': False, 'msg': '请填写用户名和密码'}), 400
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE username=? AND password=?',
+                        (username, hash_pwd(password))).fetchone()
+    conn.close()
+    if not user:
+        return jsonify({'ok': False, 'msg': '用户名或密码错误'}), 401
+    if user['banned']:
+        return jsonify({'ok': False, 'msg': '账号已被封禁，请联系管理员'}), 403
+    session.permanent = True
+    session['user_id'] = user['id']
+    session['username'] = user['username']
+    session['role'] = user['role']
+    return jsonify({'ok': True, 'username': user['username'], 'role': user['role']})
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({'ok': True})
+
+@app.route('/api/me', methods=['GET'])
+def me():
+    if 'user_id' not in session:
+        return jsonify({'ok': False, 'msg': '未登录'}), 401
+    return jsonify({'ok': True, 'id': session['user_id'],
+                    'username': session['username'], 'role': session['role']})
+
+@app.route('/api/me/password', methods=['PUT'])
+@login_required
+def change_password():
+    data = request.json or {}
+    old_pwd = data.get('old_password', '').strip()
+    new_pwd = data.get('new_password', '').strip()
+    if not old_pwd or not new_pwd:
+        return jsonify({'ok': False, 'msg': '请填写所有字段'}), 400
+    if len(new_pwd) < 6:
+        return jsonify({'ok': False, 'msg': '新密码至少6个字符'}), 400
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE id=? AND password=?',
+                        (session['user_id'], hash_pwd(old_pwd))).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '原密码错误'}), 400
+    conn.execute('UPDATE users SET password=? WHERE id=?',
+                 (hash_pwd(new_pwd), session['user_id']))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'msg': '密码修改成功'})
+
+@app.route('/api/stats', methods=['GET'])
+def public_stats():
+    """公开统计接口，不需要管理员权限"""
+    conn = get_db()
+    user_count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    topic_count = conn.execute('SELECT COUNT(*) FROM topics').fetchone()[0]
+    post_count = conn.execute('SELECT COUNT(*) FROM posts').fetchone()[0]
+    conn.close()
+    return jsonify({'users': user_count, 'topics': topic_count, 'posts': post_count})
+
+@app.route('/api/users/<int:uid>', methods=['GET'])
+def get_user_profile(uid):
+    conn = get_db()
+    user = conn.execute('SELECT id, username, role, created_at, banned FROM users WHERE id=?', (uid,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+    post_count = conn.execute('SELECT COUNT(*) FROM posts WHERE author_id=?', (uid,)).fetchone()[0]
+    topic_count = conn.execute('SELECT COUNT(*) FROM topics WHERE author_id=?', (uid,)).fetchone()[0]
+    recent_posts = conn.execute('''
+        SELECT p.id, p.content, p.created_at, t.id as topic_id, t.title as topic_title
+        FROM posts p JOIN topics t ON p.topic_id=t.id
+        WHERE p.author_id=?
+        ORDER BY p.created_at DESC LIMIT 10
+    ''', (uid,)).fetchall()
+    conn.close()
+    return jsonify({
+        'ok': True,
+        'id': user['id'],
+        'username': user['username'],
+        'role': user['role'],
+        'created_at': user['created_at'],
+        'banned': user['banned'],
+        'post_count': post_count,
+        'topic_count': topic_count,
+        'recent_posts': [dict(r) for r in recent_posts]
+    })
+
+# ---------- API 话题 ----------
+@app.route('/api/topics', methods=['GET'])
+def get_topics():
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT t.*, u.username as author_name,
+               (SELECT COUNT(*) FROM posts p WHERE p.topic_id=t.id) as post_count
+        FROM topics t LEFT JOIN users u ON t.author_id=u.id
+        ORDER BY t.pinned DESC, t.created_at DESC
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/topics', methods=['POST'])
+@login_required
+def create_topic():
+    data = request.json or {}
+    title = data.get('title', '').strip()
+    desc = data.get('description', '').strip()
+    if not title:
+        return jsonify({'ok': False, 'msg': '话题标题不能为空'}), 400
+    if len(title) > 80:
+        return jsonify({'ok': False, 'msg': '标题不超过80个字符'}), 400
+    conn = get_db()
+    cur = conn.execute('INSERT INTO topics(title,description,author_id,created_at) VALUES(?,?,?,?)',
+                 (title, desc, session['user_id'], int(time.time())))
+    new_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'id': new_id})
+
+@app.route('/api/topics/<int:tid>', methods=['GET'])
+def get_topic(tid):
+    conn = get_db()
+    topic = conn.execute(
+        'SELECT t.*, u.username as author_name FROM topics t LEFT JOIN users u ON t.author_id=u.id WHERE t.id=?',
+        (tid,)).fetchone()
+    conn.close()
+    if not topic:
+        return jsonify({'ok': False, 'msg': '话题不存在'}), 404
+    return jsonify(dict(topic))
+
+@app.route('/api/topics/<int:tid>', methods=['DELETE'])
+@admin_required
+def delete_topic(tid):
+    conn = get_db()
+    conn.execute('DELETE FROM topics WHERE id=?', (tid,))
+    conn.execute('DELETE FROM posts WHERE topic_id=?', (tid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+@app.route('/api/topics/<int:tid>/pin', methods=['POST'])
+@admin_required
+def pin_topic(tid):
+    conn = get_db()
+    topic = conn.execute('SELECT pinned FROM topics WHERE id=?', (tid,)).fetchone()
+    if not topic:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '话题不存在'}), 404
+    new_pin = 0 if topic['pinned'] else 1
+    conn.execute('UPDATE topics SET pinned=? WHERE id=?', (new_pin, tid))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'pinned': new_pin})
+
+# ---------- API 发言 ----------
+@app.route('/api/topics/<int:tid>/posts', methods=['GET'])
+def get_posts(tid):
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT p.*, u.username as author_name
+        FROM posts p LEFT JOIN users u ON p.author_id=u.id
+        WHERE p.topic_id=?
+        ORDER BY p.created_at ASC
+    ''', (tid,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/topics/<int:tid>/posts', methods=['POST'])
+@login_required
+def create_post(tid):
+    data = request.json or {}
+    content = data.get('content', '').strip()
+    reply_to = data.get('reply_to', None)
+    if not content:
+        return jsonify({'ok': False, 'msg': '内容不能为空'}), 400
+    if len(content) > 2000:
+        return jsonify({'ok': False, 'msg': '内容不能超过2000字'}), 400
+    conn = get_db()
+    topic = conn.execute('SELECT id FROM topics WHERE id=?', (tid,)).fetchone()
+    if not topic:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '话题不存在'}), 404
+    if reply_to:
+        ref = conn.execute('SELECT id FROM posts WHERE id=? AND topic_id=?', (reply_to, tid)).fetchone()
+        if not ref:
+            reply_to = None
+    cur = conn.execute('INSERT INTO posts(topic_id,author_id,content,reply_to,created_at) VALUES(?,?,?,?,?)',
+                 (tid, session['user_id'], content, reply_to, int(time.time())))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'id': cur.lastrowid})
+
+@app.route('/api/posts/<int:pid>', methods=['DELETE'])
+@login_required
+def delete_post(pid):
+    conn = get_db()
+    post = conn.execute('SELECT * FROM posts WHERE id=?', (pid,)).fetchone()
+    if not post:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '发言不存在'}), 404
+    if post['author_id'] != session['user_id'] and session.get('role') != 'admin':
+        conn.close()
+        return jsonify({'ok': False, 'msg': '无权限删除'}), 403
+    conn.execute('DELETE FROM posts WHERE id=?', (pid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+# ---------- API 管理员 ----------
+@app.route('/api/admin/users', methods=['GET'])
+@admin_required
+def admin_users():
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT u.id, u.username, u.role, u.created_at, u.banned,
+               (SELECT COUNT(*) FROM posts p WHERE p.author_id=u.id) as post_count
+        FROM users u ORDER BY u.id
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/admin/stats', methods=['GET'])
+@admin_required
+def admin_stats():
+    conn = get_db()
+    user_count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    topic_count = conn.execute('SELECT COUNT(*) FROM topics').fetchone()[0]
+    post_count = conn.execute('SELECT COUNT(*) FROM posts').fetchone()[0]
+    banned_count = conn.execute('SELECT COUNT(*) FROM users WHERE banned=1').fetchone()[0]
+    conn.close()
+    return jsonify({'users': user_count, 'topics': topic_count,
+                    'posts': post_count, 'banned': banned_count})
+
+@app.route('/api/admin/users/<int:uid>/ban', methods=['POST'])
+@admin_required
+def ban_user(uid):
+    if uid == session['user_id']:
+        return jsonify({'ok': False, 'msg': '不能封禁自己'}), 400
+    conn = get_db()
+    user = conn.execute('SELECT banned,role FROM users WHERE id=?', (uid,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+    if user['role'] == 'admin':
+        conn.close()
+        return jsonify({'ok': False, 'msg': '不能封禁管理员'}), 400
+    new_ban = 0 if user['banned'] else 1
+    conn.execute('UPDATE users SET banned=? WHERE id=?', (new_ban, uid))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'banned': new_ban})
+
+@app.route('/api/admin/users/<int:uid>', methods=['DELETE'])
+@admin_required
+def delete_user(uid):
+    if uid == session['user_id']:
+        return jsonify({'ok': False, 'msg': '不能删除自己'}), 400
+    conn = get_db()
+    conn.execute('DELETE FROM users WHERE id=?', (uid,))
+    conn.execute('DELETE FROM posts WHERE author_id=?', (uid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+@app.route('/api/admin/users/<int:uid>/password', methods=['PUT'])
+@admin_required
+def admin_reset_password(uid):
+    data = request.json or {}
+    new_pwd = data.get('new_password', '').strip()
+    if not new_pwd or len(new_pwd) < 6:
+        return jsonify({'ok': False, 'msg': '新密码至少6个字符'}), 400
+    conn = get_db()
+    user = conn.execute('SELECT id FROM users WHERE id=?', (uid,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+    conn.execute('UPDATE users SET password=? WHERE id=?', (hash_pwd(new_pwd), uid))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+@app.route('/api/admin/security_question', methods=['GET'])
+@admin_required
+def admin_get_security_question():
+    conn = get_db()
+    row = conn.execute('SELECT question, answer FROM security_answers LIMIT 1').fetchone()
+    conn.close()
+    return jsonify(dict(row) if row else {})
+
+@app.route('/api/admin/security_question', methods=['PUT'])
+@admin_required
+def update_security_question():
+    data = request.json or {}
+    q = data.get('question', '').strip()
+    a = data.get('answer', '').strip()
+    if not q or not a:
+        return jsonify({'ok': False, 'msg': '问题和答案不能为空'}), 400
+    conn = get_db()
+    conn.execute('UPDATE security_answers SET question=?,answer=? WHERE id=1', (q, a))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=False, port=5001, use_reloader=False)

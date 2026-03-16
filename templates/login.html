@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 — 第四次世界大战</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  background:#0d0d1a;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Microsoft YaHei',system-ui,sans-serif;
+  position:relative;overflow:hidden;
+}
+/* 背景粒子装饰 */
+.bg{position:fixed;inset:0;z-index:0;overflow:hidden;}
+.bg::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 20% 50%,rgba(233,69,96,.12) 0%,transparent 70%),
+             radial-gradient(ellipse 60% 80% at 80% 30%,rgba(15,52,96,.4) 0%,transparent 70%);
+}
+.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle 3s infinite;}
+@keyframes twinkle{0%,100%{opacity:.1;}50%{opacity:.5;}}
+
+.card{
+  position:relative;z-index:1;
+  background:rgba(255,255,255,.04);
+  backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:24px;
+  padding:52px 48px;
+  width:420px;
+  box-shadow:0 32px 64px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;
+}
+.logo{text-align:center;margin-bottom:40px;}
+.logo-icon{font-size:40px;margin-bottom:12px;display:block;filter:drop-shadow(0 0 16px rgba(233,69,96,.6));}
+.logo h1{
+  font-size:24px;font-weight:800;
+  background:linear-gradient(135deg,#ff6b6b,#e94560,#c23152);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:3px;
+}
+.logo p{color:rgba(255,255,255,.28);font-size:11px;margin-top:7px;letter-spacing:6px;}
+
+.field{margin-bottom:18px;}
+.field label{
+  display:block;color:rgba(255,255,255,.45);font-size:12px;
+  margin-bottom:7px;letter-spacing:1px;font-weight:500;
+}
+.field input{
+  width:100%;padding:13px 16px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;color:#fff;font-size:15px;outline:none;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.field input:focus{
+  background:rgba(255,255,255,.09);
+  border-color:rgba(233,69,96,.7);
+  box-shadow:0 0 0 3px rgba(233,69,96,.12);
+}
+.field input::placeholder{color:rgba(255,255,255,.2);}
+
+.btn-main{
+  width:100%;padding:14px;margin-top:8px;
+  background:linear-gradient(135deg,#e94560 0%,#c23152 100%);
+  border:none;border-radius:12px;color:#fff;
+  font-size:16px;font-weight:700;cursor:pointer;
+  letter-spacing:2px;
+  transition:opacity .2s,transform .1s,box-shadow .2s;
+  box-shadow:0 4px 20px rgba(233,69,96,.4);
+}
+.btn-main:hover{opacity:.92;box-shadow:0 6px 24px rgba(233,69,96,.5);}
+.btn-main:active{transform:scale(.98);}
+
+.alt{text-align:center;margin-top:22px;color:rgba(255,255,255,.3);font-size:14px;}
+.alt a{color:#e94560;text-decoration:none;font-weight:600;}
+.alt a:hover{color:#ff6b6b;}
+
+.msg-box{
+  border-radius:10px;padding:11px 14px;margin-bottom:18px;
+  font-size:14px;text-align:center;display:none;
+}
+.msg-box.err{background:rgba(233,69,96,.12);border:1px solid rgba(233,69,96,.25);color:#ff7a91;display:block;}
+.msg-box.ok{background:rgba(80,200,120,.1);border:1px solid rgba(80,200,120,.25);color:#6ee7a0;display:block;}
+
+.admin-hint{
+  margin-top:20px;padding:12px 14px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;
+  font-size:12px;color:rgba(255,255,255,.25);text-align:center;
+}
+</style>
+</head>
+<body>
+<div class="bg" id="bg"></div>
+<div class="card">
+  <div class="logo">
+    <span class="logo-icon">⚔️</span>
+    <h1>第四次世界大战</h1>
+    <p>WORLD WAR IV · FORUM</p>
+  </div>
+  <div class="msg-box" id="msg"></div>
+  <div class="field">
+    <label>用户名</label>
+    <input type="text" id="username" placeholder="请输入用户名" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>密码</label>
+    <input type="password" id="password" placeholder="请输入密码" autocomplete="current-password">
+  </div>
+  <button class="btn-main" id="login-btn" onclick="doLogin()">进入战场</button>
+  <div class="alt">还没有账号？<a href="/register">立即注册</a></div>
+  <div class="admin-hint">管理员账号 admin / admin888</div>
+</div>
+<script>
+// 生成星点背景
+const bg = document.getElementById('bg');
+for(let i=0;i<60;i++){
+  const s=document.createElement('div');
+  s.className='star';
+  const sz=Math.random()*2+1;
+  s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;animation-delay:${Math.random()*3}s;animation-duration:${2+Math.random()*3}s`;
+  bg.appendChild(s);
+}
+
+const msgEl=document.getElementById('msg');
+function showMsg(text,type){msgEl.className='msg-box '+type;msgEl.textContent=text;}
+
+async function doLogin(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value;
+  if(!username||!password){showMsg('请填写用户名和密码','err');return;}
+  const btn=document.getElementById('login-btn');
+  btn.textContent='登录中…';btn.disabled=true;
+  try{
+    const res=await fetch('/api/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body:JSON.stringify({username,password})
+    });
+    const data=await res.json();
+    if(data.ok){
+      showMsg('登录成功，正在跳转…','ok');
+      setTimeout(()=>{location.href=data.role==='admin'?'/admin':'/';},600);
+    }else{
+      showMsg(data.msg||'登录失败','err');
+      btn.textContent='进入战场';btn.disabled=false;
+    }
+  }catch(e){
+    showMsg('网络错误，请重试','err');
+    btn.textContent='进入战场';btn.disabled=false;
+  }
+}
+
+// 检查是否已登录
+(async()=>{
+  try{
+    const r=await fetch('/api/me',{credentials:'include'});
+    const d=await r.json();
+    if(d.ok) location.href=d.role==='admin'?'/admin':'/';
+  }catch(e){}
+})();
+
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('login-btn').disabled)doLogin();});
+</script>
+</body>
+</html>

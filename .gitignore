@@ -1,0 +1,29 @@
+# 数据库（含用户数据，不上传）
+forum.db
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 日志
+*.log
+server.log
+server_err.log
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# cpolar / ngrok 配置
+.cpolar/

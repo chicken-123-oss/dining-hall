@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>用户主页 — 第四次世界大战</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d0d1a;color:#e0e0e0;font-family:'Microsoft YaHei',system-ui,sans-serif;min-height:100vh;padding-bottom:60px;}
+
+.nav{
+  background:rgba(8,8,20,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(233,69,96,.25);
+  padding:0 40px;height:62px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.nav-logo{
+  font-size:18px;font-weight:800;cursor:pointer;
+  background:linear-gradient(135deg,#ff6b6b,#e94560);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:2px;
+}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-user{font-size:13px;padding:5px 12px;background:rgba(255,255,255,.04);border-radius:16px;border:1px solid rgba(255,255,255,.07);}
+.nav-user a{color:#e94560;text-decoration:none;font-weight:600;}
+.nav-btn{padding:6px 16px;border-radius:16px;font-size:13px;cursor:pointer;border:none;font-family:inherit;transition:all .2s;}
+.btn-outline{background:transparent;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.15);}
+.btn-outline:hover{color:#fff;}
+.btn-solid{background:#e94560;color:#fff;}
+.btn-solid:hover{background:#c23152;}
+
+.container{max-width:820px;margin:0 auto;padding:28px 20px;}
+
+.back-link{
+  display:inline-flex;align-items:center;gap:6px;
+  color:rgba(255,255,255,.35);font-size:14px;cursor:pointer;
+  margin-bottom:24px;transition:color .15s;
+}
+.back-link:hover{color:#e94560;}
+
+/* ── PROFILE CARD ── */
+.profile-card{
+  background:linear-gradient(135deg,rgba(233,69,96,.07),rgba(233,69,96,.02));
+  border:1px solid rgba(233,69,96,.2);
+  border-radius:20px;padding:32px;
+  display:flex;align-items:center;gap:28px;
+  margin-bottom:28px;
+}
+.profile-avatar{
+  width:80px;height:80px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;font-weight:800;color:#fff;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+}
+.profile-info{flex:1;min-width:0;}
+.profile-name{
+  font-size:24px;font-weight:800;color:#fff;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.role-badge{
+  font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600;
+}
+.badge-admin{background:rgba(233,69,96,.15);color:#e94560;border:1px solid rgba(233,69,96,.25);}
+.badge-user{background:rgba(120,130,255,.12);color:#99aaff;border:1px solid rgba(120,130,255,.2);}
+.badge-banned{background:rgba(255,140,0,.12);color:#ffaa44;border:1px solid rgba(255,140,0,.2);}
+.profile-joined{font-size:13px;color:rgba(255,255,255,.3);margin-top:8px;}
+.profile-stats{
+  display:flex;gap:28px;margin-top:16px;flex-wrap:wrap;
+}
+.ps-item .num{font-size:22px;font-weight:800;color:#e94560;line-height:1;}
+.ps-item .lbl{font-size:12px;color:rgba(255,255,255,.3);margin-top:3px;}
+
+/* ── 修改密码面板（仅自己可见） ── */
+.pwd-section{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:16px;padding:24px;margin-bottom:24px;
+}
+.section-title{font-size:16px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.section-sub{font-size:13px;color:rgba(255,255,255,.3);margin-bottom:18px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:12px;color:rgba(255,255,255,.4);margin-bottom:6px;letter-spacing:.5px;}
+.form-row input{
+  width:100%;max-width:380px;padding:11px 14px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;color:#fff;font-size:14px;outline:none;
+  font-family:inherit;transition:border-color .2s;
+}
+.form-row input:focus{border-color:rgba(233,69,96,.5);}
+.form-row input::placeholder{color:rgba(255,255,255,.2);}
+.btn-save{
+  padding:10px 24px;background:#e94560;color:#fff;
+  border:none;border-radius:10px;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:opacity .2s;
+}
+.btn-save:hover{opacity:.85;}
+.pwd-msg{font-size:13px;margin-bottom:12px;display:none;}
+
+/* ── 最近发言 ── */
+.posts-section{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:16px;overflow:hidden;
+}
+.posts-section-header{
+  padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.post-item{
+  padding:16px 24px;border-bottom:1px solid rgba(255,255,255,.04);
+  cursor:pointer;transition:background .15s;
+}
+.post-item:last-child{border-bottom:none;}
+.post-item:hover{background:rgba(255,255,255,.03);}
+.post-topic{
+  font-size:12px;color:#e94560;margin-bottom:5px;
+  display:flex;align-items:center;gap:6px;
+}
+.post-content-preview{
+  font-size:14px;color:rgba(255,255,255,.65);line-height:1.6;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.post-time{font-size:12px;color:rgba(255,255,255,.2);margin-top:5px;}
+.empty-posts{text-align:center;padding:40px;color:rgba(255,255,255,.2);font-size:14px;}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  padding:10px 22px;border-radius:12px;font-size:14px;
+  z-index:800;white-space:nowrap;display:none;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  animation:toastIn .2s ease;
+}
+.toast.show{display:block;}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+.toast.ok{background:rgba(20,40,28,.97);border:1px solid rgba(80,200,100,.35);color:#66dd88;}
+.toast.err{background:rgba(40,10,14,.97);border:1px solid rgba(233,69,96,.35);color:#ff7a91;}
+
+/* ── 骨架屏 ── */
+.skeleton{
+  background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);
+  background-size:200% 100%;animation:shimmer 1.5s infinite;
+  border-radius:16px;
+}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo" onclick="location.href='/'">⚔️ 第四次世界大战</div>
+  <div class="nav-right">
+    <div class="nav-user" id="nav-user" style="display:none"></div>
+    <button class="nav-btn btn-outline" id="btn-logout" style="display:none" onclick="doLogout()">退出</button>
+    <button class="nav-btn btn-solid" id="btn-login" style="display:none" onclick="location.href='/login'">登录</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="back-link" onclick="history.back()">← 返回</div>
+
+  <!-- 骨架占位 -->
+  <div id="skeleton" style="display:flex;align-items:center;gap:24px;margin-bottom:28px;">
+    <div class="skeleton" style="width:80px;height:80px;border-radius:50%;flex-shrink:0;"></div>
+    <div style="flex:1;">
+      <div class="skeleton" style="height:28px;width:180px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:14px;width:120px;margin-bottom:8px;"></div>
+      <div class="skeleton" style="height:14px;width:200px;"></div>
+    </div>
+  </div>
+
+  <div id="profile-wrap" style="display:none;">
+    <!-- 资料卡 -->
+    <div class="profile-card" id="profile-card"></div>
+
+    <!-- 修改密码（仅自己） -->
+    <div class="pwd-section" id="pwd-section" style="display:none;">
+      <div class="section-title">🔑 修改密码</div>
+      <div class="section-sub">修改当前账号密码，修改后需重新登录。</div>
+      <div class="form-row">
+        <label>原密码</label>
+        <input type="password" id="old-pwd" placeholder="输入原密码" autocomplete="current-password">
+      </div>
+      <div class="form-row">
+        <label>新密码（至少6位）</label>
+        <input type="password" id="new-pwd" placeholder="输入新密码" autocomplete="new-password">
+      </div>
+      <div class="form-row">
+        <label>确认新密码</label>
+        <input type="password" id="new-pwd2" placeholder="再次输入新密码">
+      </div>
+      <div class="pwd-msg" id="pwd-msg"></div>
+      <button class="btn-save" onclick="changePwd()">修改密码</button>
+    </div>
+
+    <!-- 最近发言 -->
+    <div class="posts-section" id="posts-section">
+      <div class="posts-section-header">
+        <span class="section-title" style="margin-bottom:0;">💬 最近发言</span>
+        <span id="recent-count" style="font-size:13px;color:rgba(255,255,255,.3);"></span>
+      </div>
+      <div id="recent-posts"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// 从 URL /user/123 提取用户 ID
+const profileUid = (() => {
+  const m = location.pathname.match(/\/user\/(\d+)/);
+  return m ? parseInt(m[1]) : null;
+})();
+
+if (!profileUid) {
+  document.body.innerHTML = '<div style="color:#e94560;padding:60px;text-align:center;font-size:18px">用户不存在</div>';
+}
+
+const AVATAR_COLORS = [
+  ['#e94560','#7a1a2d'],['#4e8bff','#1a3a7a'],['#50c87a','#1a4a2d'],
+  ['#ff8c42','#7a3a1a'],['#a855f7','#4a1a7a'],['#06b6d4','#1a4a5a'],
+  ['#f59e0b','#7a4a1a'],['#ec4899','#7a1a4a'],
+];
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+let me = null;
+
+async function init() {
+  if (!profileUid) return;
+
+  // 获取当前登录状态
+  try {
+    const r = await fetch('/api/me', { credentials: 'include' });
+    const d = await r.json();
+    if (d.ok) {
+      me = d;
+      document.getElementById('nav-user').style.display = '';
+      document.getElementById('nav-user').innerHTML =
+        `<a href="/user/${d.id}">${escHtml(d.username)}</a>`;
+      document.getElementById('btn-logout').style.display = '';
+    } else {
+      document.getElementById('btn-login').style.display = '';
+    }
+  } catch(e) {
+    document.getElementById('btn-login').style.display = '';
+  }
+
+  // 加载目标用户资料
+  try {
+    const r = await fetch(`/api/users/${profileUid}`, { credentials: 'include' });
+    const d = await r.json();
+    if (!d.ok) {
+      document.getElementById('skeleton').innerHTML =
+        '<div style="color:#e94560;font-size:16px">用户不存在或已被删除</div>';
+      return;
+    }
+    document.getElementById('skeleton').style.display = 'none';
+    document.getElementById('profile-wrap').style.display = '';
+    renderProfile(d);
+  } catch(e) {
+    document.getElementById('skeleton').innerHTML =
+      '<div style="color:rgba(255,255,255,.3)">加载失败，请刷新重试</div>';
+  }
+}
+
+function renderProfile(u) {
+  document.title = u.username + ' 的主页 — 第四次世界大战';
+  const [c1, c2] = avatarColor(u.username);
+  const avChar = u.username[0].toUpperCase();
+  const isSelf = me && me.id === u.id;
+
+  // 角色/状态标签
+  let badges = '';
+  if (u.role === 'admin') badges += '<span class="role-badge badge-admin">管理员</span>';
+  else badges += '<span class="role-badge badge-user">普通用户</span>';
+  if (u.banned) badges += '<span class="role-badge badge-banned">已封禁</span>';
+
+  document.getElementById('profile-card').innerHTML = `
+    <div class="profile-avatar" style="background:linear-gradient(135deg,${c1},${c2})">${avChar}</div>
+    <div class="profile-info">
+      <div class="profile-name">
+        ${escHtml(u.username)}
+        ${badges}
+        ${isSelf ? '<span style="font-size:12px;color:rgba(255,255,255,.25);font-weight:400;">（你）</span>' : ''}
+      </div>
+      <div class="profile-joined">加入时间：${fmtDate(u.created_at)}</div>
+      <div class="profile-stats">
+        <div class="ps-item"><div class="num">${u.post_count}</div><div class="lbl">总发言</div></div>
+        <div class="ps-item"><div class="num">${u.topic_count}</div><div class="lbl">发起话题</div></div>
+      </div>
+    </div>
+  `;
+
+  // 仅自己可见修改密码
+  if (isSelf) {
+    document.getElementById('pwd-section').style.display = '';
+  }
+
+  // 最近发言
+  const postsEl = document.getElementById('recent-posts');
+  const countEl = document.getElementById('recent-count');
+  if (!u.recent_posts || !u.recent_posts.length) {
+    countEl.textContent = '';
+    postsEl.innerHTML = '<div class="empty-posts">暂无发言记录</div>';
+  } else {
+    countEl.textContent = `最近 ${u.recent_posts.length} 条`;
+    postsEl.innerHTML = u.recent_posts.map(p => `
+      <div class="post-item" onclick="location.href='/topic/${p.topic_id}'">
+        <div class="post-topic">💬 ${escHtml(p.topic_title)}</div>
+        <div class="post-content-preview">${escHtml(p.content)}</div>
+        <div class="post-time">${formatTime(p.created_at)}</div>
+      </div>
+    `).join('');
+  }
+}
+
+// ── 修改密码 ──
+async function changePwd() {
+  const oldPwd = document.getElementById('old-pwd').value;
+  const newPwd = document.getElementById('new-pwd').value;
+  const newPwd2 = document.getElementById('new-pwd2').value;
+  const msgEl = document.getElementById('pwd-msg');
+  const showMsg = (msg, ok) => {
+    msgEl.style.display = 'block';
+    msgEl.style.color = ok ? '#66dd88' : '#ff7a91';
+    msgEl.textContent = msg;
+  };
+
+  if (!oldPwd || !newPwd || !newPwd2) return showMsg('请填写所有字段', false);
+  if (newPwd.length < 6) return showMsg('新密码至少6个字符', false);
+  if (newPwd !== newPwd2) return showMsg('两次密码不一致', false);
+
+  try {
+    const r = await fetch('/api/me/password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showMsg('密码修改成功，即将退出登录…', true);
+      document.getElementById('old-pwd').value = '';
+      document.getElementById('new-pwd').value = '';
+      document.getElementById('new-pwd2').value = '';
+      setTimeout(async () => {
+        await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+        location.href = '/login';
+      }, 1800);
+    } else {
+      showMsg(d.msg || '修改失败', false);
+    }
+  } catch(e) { showMsg('网络错误，请重试', false); }
+}
+
+async function doLogout() {
+  await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+  location.href = '/';
+}
+
+// ── 工具函数 ──
+let _toastTimer = null;
+function showToast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'ok' ? '✓ ' : '✕ ') + msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+}
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000), now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+  if (diff < 86400 * 30) return Math.floor(diff / 86400) + '天前';
+  return fmtDate(ts);
+}
+
+init();
+</script>
+</body>
+</html>

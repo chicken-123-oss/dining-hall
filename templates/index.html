@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第四次世界大战 — 论坛</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d0d1a;color:#e0e0e0;font-family:'Microsoft YaHei',system-ui,sans-serif;min-height:100vh;}
+
+/* NAV */
+.nav{
+  background:rgba(8,8,20,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(233,69,96,.25);
+  padding:0 40px;height:62px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.nav-logo{
+  font-size:19px;font-weight:800;cursor:pointer;
+  background:linear-gradient(135deg,#ff6b6b,#e94560);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:2px;display:flex;align-items:center;gap:8px;
+}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.nav-user{
+  color:rgba(255,255,255,.5);font-size:14px;
+  padding:6px 14px;background:rgba(255,255,255,.04);
+  border-radius:20px;border:1px solid rgba(255,255,255,.07);
+}
+.nav-user strong{color:#e94560;}
+.nav-btn{
+  padding:7px 18px;border-radius:20px;font-size:13px;cursor:pointer;border:none;
+  transition:all .2s;font-family:inherit;font-weight:500;
+}
+.btn-outline{background:transparent;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.15);}
+.btn-outline:hover{color:#fff;border-color:rgba(255,255,255,.35);}
+.btn-red{background:rgba(233,69,96,.15);color:#e94560;border:1px solid rgba(233,69,96,.3);}
+.btn-red:hover{background:rgba(233,69,96,.25);}
+.btn-solid{background:#e94560;color:#fff;border:none;}
+.btn-solid:hover{background:#c23152;}
+
+/* HERO */
+.hero{
+  padding:60px 40px 40px;
+  background:linear-gradient(180deg,rgba(233,69,96,.06) 0%,transparent 100%);
+  text-align:center;position:relative;overflow:hidden;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 60% 100% at 50% 0%,rgba(233,69,96,.08),transparent);
+}
+.hero h1{
+  font-size:42px;font-weight:900;
+  background:linear-gradient(135deg,#fff 30%,rgba(255,255,255,.6) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:4px;position:relative;text-shadow:none;
+}
+.hero h1 span{
+  background:linear-gradient(135deg,#ff6b6b,#e94560);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero p{
+  color:rgba(255,255,255,.3);font-size:14px;margin-top:12px;
+  letter-spacing:5px;position:relative;
+}
+.hero-stats{
+  display:flex;gap:32px;justify-content:center;margin-top:28px;position:relative;
+}
+.hero-stat .num{font-size:24px;font-weight:700;color:#e94560;}
+.hero-stat .lbl{font-size:12px;color:rgba(255,255,255,.3);margin-top:2px;letter-spacing:1px;}
+
+/* MAIN */
+.main{max-width:860px;margin:0 auto;padding:32px 20px 80px;}
+
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.toolbar-left{display:flex;align-items:center;gap:8px;}
+.toolbar h2{font-size:16px;font-weight:700;color:rgba(255,255,255,.8);}
+.count-badge{
+  padding:2px 10px;background:rgba(233,69,96,.12);
+  border-radius:20px;font-size:12px;color:#e94560;border:1px solid rgba(233,69,96,.2);
+}
+.create-btn{
+  display:flex;align-items:center;gap:6px;padding:9px 20px;
+  background:linear-gradient(135deg,#e94560,#c23152);
+  color:#fff;border:none;border-radius:20px;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all .2s;box-shadow:0 4px 16px rgba(233,69,96,.3);
+  font-family:inherit;
+}
+.create-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(233,69,96,.4);}
+
+/* TOPIC CARD */
+.topic-card{
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:16px;padding:20px 24px;margin-bottom:10px;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:18px;
+}
+.topic-card:hover{
+  background:rgba(233,69,96,.06);
+  border-color:rgba(233,69,96,.25);
+  transform:translateX(6px);
+}
+.topic-card.pinned{border-left:3px solid #e94560;}
+.topic-icon{
+  width:50px;height:50px;border-radius:14px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;
+  background:linear-gradient(135deg,rgba(233,69,96,.2),rgba(233,69,96,.05));
+  border:1px solid rgba(233,69,96,.15);
+}
+.topic-body{flex:1;min-width:0;}
+.topic-title{
+  font-size:17px;font-weight:600;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:8px;
+}
+.pin-tag{
+  font-size:11px;padding:2px 7px;flex-shrink:0;
+  background:rgba(233,69,96,.15);color:#e94560;border-radius:4px;
+}
+.topic-desc{
+  font-size:13px;color:rgba(255,255,255,.38);margin-top:5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.topic-meta{display:flex;align-items:center;gap:12px;font-size:12px;color:rgba(255,255,255,.25);margin-top:8px;}
+.topic-stats{text-align:right;flex-shrink:0;}
+.topic-stats .num{font-size:26px;font-weight:800;color:#e94560;line-height:1;}
+.topic-stats .lbl{font-size:11px;color:rgba(255,255,255,.25);margin-top:4px;}
+
+/* MODAL */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  display:none;align-items:center;justify-content:center;z-index:200;
+  backdrop-filter:blur(4px);
+}
+.overlay.show{display:flex;}
+.modal{
+  background:#141425;border:1px solid rgba(255,255,255,.1);
+  border-radius:20px;padding:36px;width:520px;max-width:92vw;
+  animation:fadeUp .2s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+.modal h3{font-size:18px;font-weight:700;color:#fff;margin-bottom:22px;}
+.modal label{display:block;color:rgba(255,255,255,.4);font-size:12px;margin-bottom:7px;letter-spacing:1px;}
+.modal input,.modal textarea{
+  width:100%;padding:12px 15px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;color:#fff;font-size:14px;outline:none;
+  font-family:inherit;transition:border-color .2s;margin-bottom:16px;
+}
+.modal input:focus,.modal textarea:focus{border-color:rgba(233,69,96,.6);}
+.modal input::placeholder,.modal textarea::placeholder{color:rgba(255,255,255,.2);}
+.modal textarea{min-height:90px;resize:vertical;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:4px;}
+.modal-footer button{padding:10px 24px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600;}
+.btn-cancel{background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);}
+.btn-cancel:hover{background:rgba(255,255,255,.1);}
+.btn-submit{background:#e94560;color:#fff;}
+.btn-submit:hover{background:#c23152;}
+
+.empty{text-align:center;padding:64px 20px;}
+.empty-icon{font-size:48px;display:block;margin-bottom:14px;opacity:.4;}
+.empty p{color:rgba(255,255,255,.25);font-size:15px;}
+
+.skeleton{
+  background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);
+  background-size:200% 100%;animation:shimmer 1.5s infinite;
+  border-radius:16px;height:88px;margin-bottom:10px;
+}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo" onclick="location.href='/'">⚔️ 第四次世界大战</div>
+  <div class="nav-right">
+    <div class="nav-user" id="nav-user" style="display:none"></div>
+    <button class="nav-btn btn-outline" id="btn-admin" style="display:none" onclick="location.href='/admin'">管理后台</button>
+    <button class="nav-btn btn-outline" id="btn-logout" style="display:none" onclick="doLogout()">退出</button>
+    <button class="nav-btn btn-solid" id="btn-login" onclick="location.href='/login'">登录 / 注册</button>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>⚔️ <span>第四次</span>世界大战</h1>
+  <p>WORLD WAR IV · 观点的战场 · 真理的炼狱</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num" id="hs-topics">-</div><div class="lbl">话题</div></div>
+    <div class="hero-stat"><div class="num" id="hs-posts">-</div><div class="lbl">发言</div></div>
+    <div class="hero-stat"><div class="num" id="hs-users">-</div><div class="lbl">战士</div></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <h2>🔥 全部话题</h2>
+      <span class="count-badge" id="topic-count">…</span>
+    </div>
+    <button class="create-btn" id="btn-create" onclick="openCreate()" style="display:none">＋ 发起话题</button>
+  </div>
+  <div id="topic-list">
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+  </div>
+</div>
+
+<!-- 创建话题 Modal -->
+<div class="overlay" id="create-modal" onclick="if(event.target===this)closeCreate()">
+  <div class="modal">
+    <h3>🚀 发起新话题</h3>
+    <label>话题标题 *</label>
+    <input type="text" id="new-title" placeholder="一句话说清楚你的话题" maxlength="80">
+    <label>话题描述（可选）</label>
+    <textarea id="new-desc" placeholder="补充说明，引发更多讨论…" maxlength="300"></textarea>
+    <div id="create-msg" style="color:#ff7a91;font-size:13px;margin-bottom:12px;display:none;"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeCreate()">取消</button>
+      <button class="btn-submit" onclick="submitTopic()">发布话题</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let me=null;
+const ICONS=['🌶️','🍮','🥟','🍡','🔥','⚔️','💥','🎯','🧨','🥊','🎭','🌊','🍜','🥩','🫕'];
+
+async function init(){
+  try{
+    const r=await fetch('/api/me',{credentials:'include'});
+    const d=await r.json();
+    if(d.ok){
+      me=d;
+      document.getElementById('nav-user').style.display='';
+      document.getElementById('nav-user').innerHTML=`<a href="/user/${d.id}" style="color:#e94560;text-decoration:none;font-weight:600;">${escHtml(d.username)}</a>`;
+      document.getElementById('btn-logout').style.display='';
+      document.getElementById('btn-login').style.display='none';
+      document.getElementById('btn-create').style.display='';
+      if(d.role==='admin') document.getElementById('btn-admin').style.display='';
+    }
+  }catch(e){}
+  loadTopics();
+  loadStats();
+}
+
+async function loadTopics(){
+  try{
+    const res=await fetch('/api/topics',{credentials:'include'});
+    const topics=await res.json();
+    document.getElementById('topic-count').textContent=topics.length;
+    document.getElementById('hs-topics').textContent=topics.length;
+    const totalPosts=topics.reduce((s,t)=>s+(t.post_count||0),0);
+    document.getElementById('hs-posts').textContent=totalPosts;
+
+    const list=document.getElementById('topic-list');
+    if(!topics.length){
+      list.innerHTML=`<div class="empty"><span class="empty-icon">💬</span><p>还没有话题，来发起第一场战争！</p></div>`;
+      return;
+    }
+    list.innerHTML=topics.map((t,i)=>`
+      <div class="topic-card${t.pinned?' pinned':''}" onclick="location.href='/topic/${t.id}'">
+        <div class="topic-icon">${ICONS[i%ICONS.length]}</div>
+        <div class="topic-body">
+          <div class="topic-title">
+            ${escHtml(t.title)}
+            ${t.pinned?'<span class="pin-tag">📌 置顶</span>':''}
+          </div>
+          <div class="topic-desc">${escHtml(t.description||'点击进入，发表你的立场')}</div>
+          <div class="topic-meta">
+            <span>by ${escHtml(t.author_name||'系统')}</span>
+            <span>·</span>
+            <span>${formatTime(t.created_at)}</span>
+          </div>
+        </div>
+        <div class="topic-stats">
+          <div class="num">${t.post_count||0}</div>
+          <div class="lbl">条发言</div>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){
+    document.getElementById('topic-list').innerHTML='<div class="empty"><p>加载失败，请刷新重试</p></div>';
+  }
+}
+
+// 从统计接口拿用户数
+async function loadStats(){
+  try{
+    const r=await fetch('/api/admin/stats',{credentials:'include'});
+    if(r.ok){const d=await r.json();document.getElementById('hs-users').textContent=d.users||'-';}
+  }catch(e){}
+}
+
+function openCreate(){
+  if(!me){location.href='/login';return;}
+  document.getElementById('new-title').value='';
+  document.getElementById('new-desc').value='';
+  document.getElementById('create-msg').style.display='none';
+  document.getElementById('create-modal').classList.add('show');
+  setTimeout(()=>document.getElementById('new-title').focus(),100);
+}
+function closeCreate(){document.getElementById('create-modal').classList.remove('show');}
+
+async function submitTopic(){
+  const title=document.getElementById('new-title').value.trim();
+  const description=document.getElementById('new-desc').value.trim();
+  const cmsg=document.getElementById('create-msg');
+  if(!title){cmsg.style.display='block';cmsg.textContent='请输入话题标题';return;}
+  cmsg.style.display='none';
+  try{
+    const res=await fetch('/api/topics',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      credentials:'include',body:JSON.stringify({title,description})
+    });
+    const data=await res.json();
+    if(data.ok){closeCreate();loadTopics();if(data.id)location.href='/topic/'+data.id;}
+    else{cmsg.style.display='block';cmsg.textContent=data.msg||'发布失败';}
+  }catch(e){cmsg.style.display='block';cmsg.textContent='网络错误，请重试';}
+}
+
+async function doLogout(){
+  await fetch('/api/logout',{method:'POST',credentials:'include'});
+  me=null;
+  document.getElementById('nav-user').style.display='none';
+  document.getElementById('btn-logout').style.display='none';
+  document.getElementById('btn-admin').style.display='none';
+  document.getElementById('btn-create').style.display='none';
+  document.getElementById('btn-login').style.display='';
+  location.reload();
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function formatTime(ts){
+  if(!ts)return '';
+  const d=new Date(ts*1000),now=new Date();
+  const diff=Math.floor((now-d)/1000);
+  if(diff<60)return '刚刚';
+  if(diff<3600)return Math.floor(diff/60)+'分钟前';
+  if(diff<86400)return Math.floor(diff/3600)+'小时前';
+  if(diff<86400*30)return Math.floor(diff/86400)+'天前';
+  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+}
+
+init();
+loadStats();
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('create-modal').classList.contains('show'))submitTopic();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理后台 — 第四次世界大战</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0a18;color:#ddd;font-family:'Microsoft YaHei',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+
+/* NAV */
+.nav{
+  background:rgba(8,8,20,.97);backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(233,69,96,.3);
+  padding:0 28px;height:60px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.nav-left{display:flex;align-items:center;gap:16px;}
+.nav-logo{
+  font-size:17px;font-weight:800;
+  background:linear-gradient(135deg,#ff6b6b,#e94560);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:2px;cursor:pointer;
+}
+.nav-badge{
+  font-size:11px;padding:2px 9px;border-radius:10px;
+  background:rgba(233,69,96,.15);color:#e94560;
+  border:1px solid rgba(233,69,96,.25);letter-spacing:1px;
+}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-btn{
+  padding:6px 16px;border-radius:16px;font-size:13px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.12);background:transparent;
+  color:rgba(255,255,255,.5);font-family:inherit;transition:all .2s;
+}
+.nav-btn:hover{color:#fff;border-color:rgba(255,255,255,.3);}
+
+/* LAYOUT */
+.layout{display:flex;flex:1;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{
+  width:210px;flex-shrink:0;
+  background:rgba(255,255,255,.02);
+  border-right:1px solid rgba(255,255,255,.05);
+  padding:20px 0;
+  position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;
+}
+.sidebar-section{
+  font-size:11px;color:rgba(255,255,255,.22);
+  letter-spacing:2px;padding:14px 20px 8px;
+}
+.sidebar-item{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 20px;font-size:14px;color:rgba(255,255,255,.45);
+  cursor:pointer;border-left:2px solid transparent;
+  transition:all .15s;
+}
+.sidebar-item:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.04);}
+.sidebar-item.active{color:#e94560;border-left-color:#e94560;background:rgba(233,69,96,.07);}
+.sidebar-item .icon{font-size:16px;width:20px;text-align:center;}
+
+/* CONTENT */
+.content{flex:1;padding:28px 32px;overflow-y:auto;height:calc(100vh - 60px);}
+
+/* PANELS */
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:24px;}
+.page-header h2{font-size:20px;font-weight:700;color:#fff;}
+.page-header p{color:rgba(255,255,255,.3);font-size:13px;margin-top:5px;}
+
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:28px;}
+.stat-card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;padding:20px;transition:border-color .2s;
+}
+.stat-card:hover{border-color:rgba(233,69,96,.25);}
+.stat-card .num{font-size:30px;font-weight:800;color:#e94560;line-height:1;}
+.stat-card .lbl{font-size:12px;color:rgba(255,255,255,.35);margin-top:7px;}
+.stat-card .icon{font-size:22px;margin-bottom:8px;}
+
+/* ACTIVITY */
+.activity-panel{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  border-radius:14px;padding:20px;
+}
+.activity-panel h3{font-size:15px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:14px;}
+.activity-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.activity-item:last-child{border-bottom:none;}
+.ai-dot{width:8px;height:8px;border-radius:50%;background:#e94560;flex-shrink:0;}
+.ai-text{font-size:13px;color:rgba(255,255,255,.5);flex:1;}
+.ai-time{font-size:12px;color:rgba(255,255,255,.2);}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border-radius:14px;border:1px solid rgba(255,255,255,.06);}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+thead tr{background:rgba(255,255,255,.04);}
+th{padding:12px 16px;text-align:left;color:rgba(255,255,255,.4);font-weight:600;font-size:12px;letter-spacing:.5px;white-space:nowrap;}
+td{padding:12px 16px;border-top:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+tbody tr:hover td{background:rgba(255,255,255,.025);}
+
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;}
+.badge-admin{background:rgba(233,69,96,.15);color:#e94560;border:1px solid rgba(233,69,96,.2);}
+.badge-user{background:rgba(120,130,255,.12);color:#99aaff;border:1px solid rgba(120,130,255,.2);}
+.badge-banned{background:rgba(255,140,0,.12);color:#ffaa44;border:1px solid rgba(255,140,0,.2);}
+.badge-ok{background:rgba(80,200,100,.1);color:#66dd88;border:1px solid rgba(80,200,100,.2);}
+.badge-pin{background:rgba(233,69,96,.1);color:#ff8fa0;border:1px solid rgba(233,69,96,.15);}
+
+.act-btn{
+  padding:4px 12px;border-radius:8px;border:none;font-size:12px;cursor:pointer;
+  font-family:inherit;transition:opacity .15s;margin-right:4px;
+}
+.act-btn:hover{opacity:.75;}
+.btn-ban{background:rgba(255,165,0,.15);color:#ffaa44;}
+.btn-unban{background:rgba(80,200,100,.12);color:#66dd88;}
+.btn-del{background:rgba(233,69,96,.12);color:#ff7a91;}
+.btn-pin{background:rgba(120,130,255,.12);color:#99aaff;}
+.btn-unpin{background:rgba(80,200,100,.1);color:#66dd88;}
+.btn-view{background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);}
+.btn-pwd{background:rgba(100,180,255,.1);color:#88ccff;border:1px solid rgba(100,180,255,.2);}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:300;backdrop-filter:blur(4px);}
+.overlay.show{display:flex;}
+.modal{background:#141425;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:32px 36px;width:420px;max-width:92vw;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+.modal h3{font-size:17px;font-weight:700;color:#fff;margin-bottom:6px;}
+.modal .modal-sub{font-size:13px;color:rgba(255,255,255,.3);margin-bottom:22px;}
+.modal .modal-sub strong{color:#e94560;}
+.modal-field{margin-bottom:16px;}
+.modal-field label{display:block;font-size:12px;color:rgba(255,255,255,.4);margin-bottom:7px;letter-spacing:.5px;}
+.modal-field input{width:100%;padding:11px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-size:14px;outline:none;font-family:inherit;transition:border-color .2s;}
+.modal-field input:focus{border-color:rgba(233,69,96,.5);}
+.modal-field input::placeholder{color:rgba(255,255,255,.2);}
+.modal-err{font-size:13px;color:#ff7a91;margin-bottom:12px;display:none;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:4px;}
+.modal-footer button{padding:9px 22px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600;}
+.btn-cancel{background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);}
+.btn-cancel:hover{background:rgba(255,255,255,.1);}
+.btn-confirm{background:#e94560;color:#fff;}
+.btn-confirm:hover{background:#c23152;}
+
+/* FORM */
+.form-section{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;padding:24px;margin-bottom:20px;
+}
+.form-section h3{font-size:15px;font-weight:600;color:rgba(255,255,255,.75);margin-bottom:6px;}
+.form-section p{font-size:13px;color:rgba(255,255,255,.3);margin-bottom:18px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:12px;color:rgba(255,255,255,.4);margin-bottom:6px;letter-spacing:.5px;}
+.form-row input{
+  width:100%;max-width:440px;padding:11px 14px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;color:#fff;font-size:14px;outline:none;
+  font-family:inherit;transition:border-color .2s;
+}
+.form-row input:focus{border-color:rgba(233,69,96,.5);}
+.form-row input::placeholder{color:rgba(255,255,255,.2);}
+.btn-save{
+  padding:10px 26px;background:#e94560;color:#fff;
+  border:none;border-radius:10px;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:opacity .2s;
+}
+.btn-save:hover{opacity:.85;}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:rgba(20,40,28,.95);border:1px solid rgba(80,200,100,.35);color:#66dd88;
+  padding:10px 24px;border-radius:12px;font-size:14px;
+  z-index:999;display:none;white-space:nowrap;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.toast.show{display:block;animation:toastIn .2s ease;}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+.toast.err{background:rgba(40,10,14,.95);border-color:rgba(233,69,96,.35);color:#ff7a91;}
+
+.empty-row td{text-align:center;padding:40px;color:rgba(255,255,255,.2);}
+.loading-text{color:rgba(255,255,255,.25);padding:20px 0;}
+
+.search-bar{
+  display:flex;align-items:center;gap:10px;margin-bottom:16px;
+}
+.search-bar input{
+  padding:9px 14px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);border-radius:10px;
+  color:#fff;font-size:14px;outline:none;width:240px;
+  transition:border-color .2s;font-family:inherit;
+}
+.search-bar input:focus{border-color:rgba(233,69,96,.4);}
+.search-bar input::placeholder{color:rgba(255,255,255,.2);}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-left">
+    <div class="nav-logo" onclick="location.href='/'">⚔️ 第四次世界大战</div>
+    <span class="nav-badge">管理后台</span>
+  </div>
+  <div class="nav-right">
+    <span id="nav-admin" style="color:rgba(255,255,255,.35);font-size:13px;"></span>
+    <button class="nav-btn" onclick="location.href='/'">返回首页</button>
+    <button class="nav-btn" onclick="doLogout()">退出登录</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-section">主菜单</div>
+    <div class="sidebar-item active" data-tab="overview" onclick="switchTab('overview')">
+      <span class="icon">📊</span>数据概览
+    </div>
+    <div class="sidebar-section">内容管理</div>
+    <div class="sidebar-item" data-tab="users" onclick="switchTab('users')">
+      <span class="icon">👥</span>用户管理
+    </div>
+    <div class="sidebar-item" data-tab="topics" onclick="switchTab('topics')">
+      <span class="icon">💬</span>话题管理
+    </div>
+    <div class="sidebar-section">系统</div>
+    <div class="sidebar-item" data-tab="security" onclick="switchTab('security')">
+      <span class="icon">🔐</span>安全设置
+    </div>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="content">
+
+    <!-- 概览 -->
+    <div class="panel active" id="panel-overview">
+      <div class="page-header">
+        <h2>数据概览</h2>
+        <p>论坛实时统计数据</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="icon">👥</div><div class="num" id="s-users">—</div><div class="lbl">注册用户</div></div>
+        <div class="stat-card"><div class="icon">💬</div><div class="num" id="s-topics">—</div><div class="lbl">话题数量</div></div>
+        <div class="stat-card"><div class="icon">📝</div><div class="num" id="s-posts">—</div><div class="lbl">总发言数</div></div>
+        <div class="stat-card"><div class="icon">🚫</div><div class="num" id="s-banned">—</div><div class="lbl">封禁用户</div></div>
+      </div>
+      <div class="activity-panel">
+        <h3>快速入口</h3>
+        <div class="activity-item"><div class="ai-dot"></div><div class="ai-text">管理所有注册用户，支持封禁 / 删除</div><button class="act-btn btn-view" onclick="switchTab('users')">进入 →</button></div>
+        <div class="activity-item"><div class="ai-dot"></div><div class="ai-text">管理全部话题，支持置顶 / 删除</div><button class="act-btn btn-view" onclick="switchTab('topics')">进入 →</button></div>
+        <div class="activity-item"><div class="ai-dot"></div><div class="ai-text">修改注册安全问题与答案</div><button class="act-btn btn-view" onclick="switchTab('security')">进入 →</button></div>
+      </div>
+    </div>
+
+    <!-- 用户管理 -->
+    <div class="panel" id="panel-users">
+      <div class="page-header">
+        <h2>用户管理</h2>
+        <p>查看、封禁或删除论坛用户</p>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="user-search" placeholder="搜索用户名…" oninput="filterUsers()">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>用户名</th><th>角色</th><th>注册时间</th><th>状态</th><th>发言数</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr class="empty-row"><td colspan="7">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 话题管理 -->
+    <div class="panel" id="panel-topics">
+      <div class="page-header">
+        <h2>话题管理</h2>
+        <p>置顶、删除话题，点击标题可进入话题页</p>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="topic-search" placeholder="搜索话题标题…" oninput="filterTopics()">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>标题</th><th>发起人</th><th>创建时间</th><th>发言数</th><th>状态</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="topics-tbody">
+            <tr class="empty-row"><td colspan="7">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 安全设置 -->
+    <div class="panel" id="panel-security">
+      <div class="page-header">
+        <h2>安全设置</h2>
+        <p>管理注册时的安全验证问题</p>
+      </div>
+      <div class="form-section">
+        <h3>🔑 修改管理员密码</h3>
+        <p>修改当前登录管理员账号的密码，修改后需重新登录。</p>
+        <div class="form-row">
+          <label>原密码</label>
+          <input type="password" id="admin-old-pwd" placeholder="输入原密码" autocomplete="current-password">
+        </div>
+        <div class="form-row">
+          <label>新密码（至少6位）</label>
+          <input type="password" id="admin-new-pwd" placeholder="输入新密码" autocomplete="new-password">
+        </div>
+        <div class="form-row">
+          <label>确认新密码</label>
+          <input type="password" id="admin-new-pwd2" placeholder="再次输入新密码">
+        </div>
+        <div id="pwd-msg" style="font-size:13px;margin-bottom:12px;display:none;"></div>
+        <button class="btn-save" onclick="changeAdminPwd()">修改密码</button>
+      </div>
+      <div class="form-section">
+        <h3>🔐 注册安全问题</h3>
+        <p>新用户注册时必须正确回答此问题才能完成注册。修改后立即生效。</p>
+        <div class="form-row">
+          <label>当前安全问题</label>
+          <input type="text" id="sec-question" placeholder="输入问题内容">
+        </div>
+        <div class="form-row">
+          <label>正确答案（不区分大小写）</label>
+          <input type="text" id="sec-answer" placeholder="输入答案">
+        </div>
+        <button class="btn-save" onclick="saveSecurity()">保存修改</button>
+      </div>
+      <div class="form-section">
+        <h3>ℹ️ 默认管理员账号</h3>
+        <p>初始管理员：<strong style="color:#e94560">admin</strong> / <strong style="color:#e94560">admin888</strong>，请登录后尽快修改密码（当前版本无密码修改界面，可直接修改数据库）。</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 重置密码 Modal -->
+<div class="overlay" id="reset-pwd-overlay" onclick="if(event.target===this)closeResetPwd()">
+  <div class="modal">
+    <h3>🔑 重置用户密码</h3>
+    <div class="modal-sub">为用户 <strong id="reset-pwd-name"></strong> 设置新密码</div>
+    <div class="modal-field">
+      <label>新密码（至少6位）</label>
+      <input type="password" id="reset-pwd-input" placeholder="输入新密码" autocomplete="new-password">
+    </div>
+    <div class="modal-field">
+      <label>确认新密码</label>
+      <input type="password" id="reset-pwd-input2" placeholder="再次输入新密码">
+    </div>
+    <div class="modal-err" id="reset-pwd-err"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeResetPwd()">取消</button>
+      <button class="btn-confirm" id="reset-pwd-btn" onclick="submitResetPwd()">确认重置</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let allUsers=[], allTopics=[];
+
+/* ── 权限校验 ── */
+async function checkAdmin(){
+  try{
+    const r=await fetch('/api/me',{credentials:'include'});
+    const d=await r.json();
+    if(!d.ok||d.role!=='admin'){location.href='/login';return false;}
+    document.getElementById('nav-admin').textContent='欢迎，'+d.username;
+    return true;
+  }catch(e){location.href='/login';return false;}
+}
+
+/* ── 标签切换 ── */
+function switchTab(tab){
+  document.querySelectorAll('.sidebar-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.tab===tab);
+  });
+  document.querySelectorAll('.panel').forEach(el=>{
+    el.classList.toggle('active', el.id==='panel-'+tab);
+  });
+  if(tab==='overview') loadStats();
+  if(tab==='users')    loadUsers();
+  if(tab==='topics')   loadTopics();
+  if(tab==='security') loadSecurity();
+}
+
+/* ── 概览 ── */
+async function loadStats(){
+  try{
+    const r=await fetch('/api/admin/stats',{credentials:'include'});
+    const d=await r.json();
+    document.getElementById('s-users').textContent=d.users??'—';
+    document.getElementById('s-topics').textContent=d.topics??'—';
+    document.getElementById('s-posts').textContent=d.posts??'—';
+    document.getElementById('s-banned').textContent=d.banned??'—';
+  }catch(e){}
+}
+
+/* ── 用户管理 ── */
+async function loadUsers(){
+  try{
+    const r=await fetch('/api/admin/users',{credentials:'include'});
+    allUsers=await r.json();
+    renderUsers(allUsers);
+  }catch(e){toast('加载用户失败','err');}
+}
+
+function renderUsers(users){
+  const tbody=document.getElementById('users-tbody');
+  if(!users.length){tbody.innerHTML='<tr class="empty-row"><td colspan="7">暂无用户</td></tr>';return;}
+  tbody.innerHTML=users.map(u=>`
+    <tr>
+      <td style="color:rgba(255,255,255,.3)">${u.id}</td>
+      <td><strong style="color:#fff">${escHtml(u.username)}</strong></td>
+      <td><span class="badge badge-${u.role==='admin'?'admin':'user'}">${u.role==='admin'?'管理员':'普通用户'}</span></td>
+      <td style="color:rgba(255,255,255,.4)">${fmtDate(u.created_at)}</td>
+      <td>${u.banned
+        ?'<span class="badge badge-banned">封禁中</span>'
+        :'<span class="badge badge-ok">正常</span>'}</td>
+      <td style="color:rgba(255,255,255,.4)">${u.post_count||0}</td>
+      <td>
+        ${u.role!=='admin'?`
+          <button class="act-btn ${u.banned?'btn-unban':'btn-ban'}" onclick="toggleBan(${u.id})">${u.banned?'解封':'封禁'}</button>
+          <button class="act-btn btn-pwd" onclick="openResetPwd(${u.id},'${escHtml(u.username)}')">重置密码</button>
+          <button class="act-btn btn-del" onclick="delUser(${u.id})">删除</button>
+        `:'<span style="color:rgba(255,255,255,.2);font-size:12px">受保护</span>'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterUsers(){
+  const kw=document.getElementById('user-search').value.trim().toLowerCase();
+  renderUsers(kw?allUsers.filter(u=>u.username.toLowerCase().includes(kw)):allUsers);
+}
+
+async function toggleBan(uid){
+  try{
+    const r=await fetch(`/api/admin/users/${uid}/ban`,{method:'POST',credentials:'include'});
+    const d=await r.json();
+    if(d.ok){toast(d.banned?'已封禁用户':'已解封用户');loadUsers();}
+    else toast(d.msg||'操作失败','err');
+  }catch(e){toast('网络错误','err');}
+}
+
+async function delUser(uid){
+  if(!confirm('确定删除该用户？其所有发言也会同步删除，此操作不可撤销。')) return;
+  try{
+    const r=await fetch(`/api/admin/users/${uid}`,{method:'DELETE',credentials:'include'});
+    const d=await r.json();
+    if(d.ok){toast('用户已删除');loadUsers();}
+    else toast(d.msg||'删除失败','err');
+  }catch(e){toast('网络错误','err');}
+}
+
+/* ── 话题管理 ── */
+async function loadTopics(){
+  try{
+    const r=await fetch('/api/topics',{credentials:'include'});
+    allTopics=await r.json();
+    renderTopics(allTopics);
+  }catch(e){toast('加载话题失败','err');}
+}
+
+function renderTopics(topics){
+  const tbody=document.getElementById('topics-tbody');
+  if(!topics.length){tbody.innerHTML='<tr class="empty-row"><td colspan="7">暂无话题</td></tr>';return;}
+  tbody.innerHTML=topics.map(t=>`
+    <tr>
+      <td style="color:rgba(255,255,255,.3)">${t.id}</td>
+      <td>
+        <a href="/topic/${t.id}" target="_blank" style="color:#fff;text-decoration:none;font-weight:500;"
+           title="${escHtml(t.title)}">${escHtml(t.title.length>30?t.title.slice(0,30)+'…':t.title)}</a>
+      </td>
+      <td style="color:rgba(255,255,255,.45)">${escHtml(t.author_name||'系统')}</td>
+      <td style="color:rgba(255,255,255,.35)">${fmtDate(t.created_at)}</td>
+      <td style="color:#e94560;font-weight:700">${t.post_count||0}</td>
+      <td>${t.pinned?'<span class="badge badge-pin">📌 置顶</span>':'<span style="color:rgba(255,255,255,.2);font-size:12px">—</span>'}</td>
+      <td>
+        <button class="act-btn ${t.pinned?'btn-unpin':'btn-pin'}" onclick="pinTopic(${t.id})">${t.pinned?'取消置顶':'置顶'}</button>
+        <button class="act-btn btn-del" onclick="delTopic(${t.id})">删除</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterTopics(){
+  const kw=document.getElementById('topic-search').value.trim().toLowerCase();
+  renderTopics(kw?allTopics.filter(t=>t.title.toLowerCase().includes(kw)):allTopics);
+}
+
+async function pinTopic(tid){
+  try{
+    const r=await fetch(`/api/topics/${tid}/pin`,{method:'POST',credentials:'include'});
+    const d=await r.json();
+    if(d.ok){toast(d.pinned?'已置顶':'已取消置顶');loadTopics();}
+    else toast(d.msg||'操作失败','err');
+  }catch(e){toast('网络错误','err');}
+}
+
+async function delTopic(tid){
+  if(!confirm('确定删除该话题及其所有发言？此操作不可撤销。')) return;
+  try{
+    const r=await fetch(`/api/topics/${tid}`,{method:'DELETE',credentials:'include'});
+    const d=await r.json();
+    if(d.ok){toast('话题已删除');loadTopics();}
+    else toast(d.msg||'删除失败','err');
+  }catch(e){toast('网络错误','err');}
+}
+
+/* ── 安全设置 ── */
+async function loadSecurity(){
+  try{
+    const r=await fetch('/api/admin/security_question',{credentials:'include'});
+    const d=await r.json();
+    document.getElementById('sec-question').value=d.question||'';
+    document.getElementById('sec-answer').value='';
+  }catch(e){}
+}
+
+async function saveSecurity(){
+  const question=document.getElementById('sec-question').value.trim();
+  const answer=document.getElementById('sec-answer').value.trim();
+  if(!question||!answer){toast('问题和答案不能为空','err');return;}
+  try{
+    const r=await fetch('/api/admin/security_question',{
+      method:'PUT',headers:{'Content-Type':'application/json'},
+      credentials:'include',body:JSON.stringify({question,answer})
+    });
+    const d=await r.json();
+    if(d.ok){toast('安全问题已更新');document.getElementById('sec-answer').value='';}
+    else toast(d.msg||'保存失败','err');
+  }catch(e){toast('网络错误','err');}
+}
+
+/* ── 重置用户密码 Modal ── */
+let resetPwdUid = null;
+
+function openResetPwd(uid, uname) {
+  resetPwdUid = uid;
+  document.getElementById('reset-pwd-name').textContent = uname;
+  document.getElementById('reset-pwd-input').value = '';
+  document.getElementById('reset-pwd-input2').value = '';
+  const errEl = document.getElementById('reset-pwd-err');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  document.getElementById('reset-pwd-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('reset-pwd-input').focus(), 80);
+}
+
+function closeResetPwd() {
+  document.getElementById('reset-pwd-overlay').classList.remove('show');
+  resetPwdUid = null;
+}
+
+async function submitResetPwd() {
+  const newPwd = document.getElementById('reset-pwd-input').value;
+  const newPwd2 = document.getElementById('reset-pwd-input2').value;
+  const errEl = document.getElementById('reset-pwd-err');
+  const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+
+  if (!newPwd || !newPwd2) return showErr('请填写所有字段');
+  if (newPwd.length < 6) return showErr('新密码至少6个字符');
+  if (newPwd !== newPwd2) return showErr('两次密码不一致');
+
+  const btn = document.getElementById('reset-pwd-btn');
+  btn.disabled = true; btn.textContent = '重置中…';
+  try {
+    const r = await fetch(`/api/admin/users/${resetPwdUid}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ new_password: newPwd })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      closeResetPwd();
+      toast('密码已重置');
+    } else {
+      showErr(d.msg || '重置失败');
+    }
+  } catch(e) { showErr('网络错误，请重试'); }
+  btn.disabled = false; btn.textContent = '确认重置';
+}
+
+/* ── 管理员修改自己密码 ── */
+async function changeAdminPwd() {
+  const oldPwd = document.getElementById('admin-old-pwd').value;
+  const newPwd = document.getElementById('admin-new-pwd').value;
+  const newPwd2 = document.getElementById('admin-new-pwd2').value;
+  const msgEl = document.getElementById('pwd-msg');
+  const showMsg = (msg, ok) => {
+    msgEl.style.display = 'block';
+    msgEl.style.color = ok ? '#66dd88' : '#ff7a91';
+    msgEl.textContent = msg;
+  };
+
+  if (!oldPwd || !newPwd || !newPwd2) return showMsg('请填写所有字段', false);
+  if (newPwd.length < 6) return showMsg('新密码至少6个字符', false);
+  if (newPwd !== newPwd2) return showMsg('两次密码不一致', false);
+
+  try {
+    const r = await fetch('/api/me/password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showMsg('密码修改成功，即将退出登录…', true);
+      document.getElementById('admin-old-pwd').value = '';
+      document.getElementById('admin-new-pwd').value = '';
+      document.getElementById('admin-new-pwd2').value = '';
+      setTimeout(async () => {
+        await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+        location.href = '/login';
+      }, 1800);
+    } else {
+      showMsg(d.msg || '修改失败', false);
+    }
+  } catch(e) { showMsg('网络错误，请重试', false); }
+}
+
+/* ── 键盘支持 ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeResetPwd();
+  if (e.key === 'Enter' && document.getElementById('reset-pwd-overlay').classList.contains('show')) submitResetPwd();
+});
+
+/* ── 工具 ── */
+async function doLogout(){
+  await fetch('/api/logout',{method:'POST',credentials:'include'});
+  location.href='/login';
+}
+
+let toastTimer=null;
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=(type==='ok'?'✓ ':'✕ ')+msg;
+  el.className='toast show'+(type==='err'?' err':'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtDate(ts){
+  if(!ts)return '—';
+  const d=new Date(ts*1000);
+  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+}
+
+/* ── 初始化 ── */
+(async()=>{
+  if(await checkAdmin()) loadStats();
+})();
+</script>
+</body>
+</html>
