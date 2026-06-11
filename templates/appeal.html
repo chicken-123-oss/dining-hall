@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账号申诉 - 豆腐脑战争论坛</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .appeal-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .appeal-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .appeal-title {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .appeal-subtitle {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+            color: #856404;
+        }
+
+        .warning-box strong {
+            color: #d63031;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-label.required::after {
+            content: ' *';
+            color: #e74c3c;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #fafbfc;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .char-count {
+            text-align: right;
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            background: #27ae60;
+        }
+
+        .toast.error {
+            background: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="appeal-container">
+        <div class="appeal-header">
+            <h1 class="appeal-title">📢 账号申诉</h1>
+            <p class="appeal-subtitle">如果您的账号被误封，请在此提交申诉，管理员会尽快处理</p>
+        </div>
+
+        <div class="warning-box">
+            <strong>注意：</strong>只有被封禁的账号才能提交申诉。请确保您填写的信息真实有效，虚假申诉可能会导致永久封禁。
+        </div>
+
+        <form id="appealForm">
+            <div class="form-group">
+                <label class="form-label required">申诉账号</label>
+                <input type="text" class="form-input" id="appealUsername" readonly>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label required" for="appealReason">申诉理由</label>
+                <textarea 
+                    class="form-input form-textarea" 
+                    id="appealReason" 
+                    placeholder="请详细说明您认为账号被误封的原因，提供相关证据..."></textarea>
+                <div class="char-count">
+                    <span id="reasonCount">0</span> / 1000
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="appealContact">联系方式（可选）</label>
+                <input 
+                    type="text" 
+                    class="form-input" 
+                    id="appealContact" 
+                    placeholder="邮箱或QQ等其他联系方式，方便管理员回复">
+                <div class="char-count">
+                    <span id="contactCount">0</span> / 100
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">提交申诉</button>
+        </form>
+
+        <div class="back-link">
+            <a href="/login">← 返回登录页</a>
+        </div>
+    </div>
+
+    <script>
+        // 从URL参数获取用户名
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('username');
+        
+        if (username) {
+            document.getElementById('appealUsername').value = username;
+        } else {
+            // 如果没有用户名参数，尝试从本地存储获取
+            const savedUsername = localStorage.getItem('username');
+            if (savedUsername) {
+                document.getElementById('appealUsername').value = savedUsername;
+            } else {
+                showToast('无法获取用户信息，请先登录', 'error');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+            }
+        }
+
+        // 字符计数
+        const reasonTextarea = document.getElementById('appealReason');
+        const reasonCount = document.getElementById('reasonCount');
+        
+        reasonTextarea.addEventListener('input', function() {
+            const length = this.value.length;
+            reasonCount.textContent = length;
+            if (length > 1000) {
+                this.style.borderColor = '#e74c3c';
+            } else {
+                this.style.borderColor = '#e1e8ed';
+            }
+        });
+
+        const contactInput = document.getElementById('appealContact');
+        const contactCount = document.getElementById('contactCount');
+        
+        contactInput.addEventListener('input', function() {
+            const length = this.value.length;
+            contactCount.textContent = length;
+            if (length > 100) {
+                this.style.borderColor = '#e74c3c';
+            } else {
+                this.style.borderColor = '#e1e8ed';
+            }
+        });
+
+        // 表单提交
+        document.getElementById('appealForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('appealUsername').value;
+            const reason = reasonTextarea.value.trim();
+            const contact = contactInput.value.trim();
+            
+            if (!reason) {
+                showToast('请填写申诉理由', 'error');
+                return;
+            }
+            
+            if (reason.length > 1000) {
+                showToast('申诉理由不能超过1000字', 'error');
+                return;
+            }
+            
+            if (contact && contact.length > 100) {
+                showToast('联系方式不能超过100字', 'error');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+
+            try {
+                const response = await fetch('/api/appeal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        reason: reason,
+                        contact: contact
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.ok) {
+                    showToast('申诉提交成功！请耐心等待管理员处理', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    showToast(result.msg || '提交失败', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('网络错误，请稍后重试', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '提交申诉';
+            }
+        });
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

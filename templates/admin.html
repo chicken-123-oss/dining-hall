@@ -232,6 +232,10 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
     <div class="sidebar-item" data-tab="security" onclick="switchTab('security')">
       <span class="icon">🔐</span>安全设置
     </div>
+    <div class="sidebar-section">申诉管理</div>
+    <div class="sidebar-item" data-tab="appeals" onclick="switchTab('appeals')">
+      <span class="icon">📢</span>账号申诉
+    </div>
   </aside>
 
   <!-- 主内容 -->
@@ -298,6 +302,44 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
           </thead>
           <tbody id="topics-tbody">
             <tr class="empty-row"><td colspan="7">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 申诉管理 -->
+    <div class="panel" id="panel-appeals">
+      <div class="page-header">
+        <h2>账号申诉管理</h2>
+        <p>处理用户的账号封禁申诉请求</p>
+      </div>
+      
+      <div class="search-bar">
+        <select id="appeal-status-filter" onchange="loadAppeals()" style="padding:9px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font-size:14px;outline:none;">
+          <option value="all">全部申诉</option>
+          <option value="pending">待处理</option>
+          <option value="approved">已批准</option>
+          <option value="rejected">已拒绝</option>
+        </select>
+        <input type="text" id="appeal-search" placeholder="搜索用户名或申诉理由…" oninput="filterAppeals()" style="padding:9px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font-size:14px;outline:none;width:280px;">
+      </div>
+      
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>申诉人</th>
+              <th>申诉理由</th>
+              <th>联系方式</th>
+              <th>提交时间</th>
+              <th>状态</th>
+              <th>处理人</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="appeals-tbody">
+            <tr class="empty-row"><td colspan="8">加载中…</td></tr>
           </tbody>
         </table>
       </div>
@@ -666,9 +708,130 @@ function fmtDate(ts){
   return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
 }
 
-/* ── 初始化 ── */
+/* ── 申诉管理 ── */
+let allAppeals = [];
+
+async function loadAppeals() {
+  try {
+    const status = document.getElementById('appeal-status-filter').value;
+    const r = await fetch(`/api/admin/appeals?status=${status}`, { credentials: 'include' });
+    allAppeals = await r.json();
+    renderAppeals(allAppeals);
+  } catch (e) {
+    toast('加载申诉失败', 'err');
+  }
+}
+
+function renderAppeals(appeals) {
+  const tbody = document.getElementById('appeals-tbody');
+  if (!appeals.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">暂无申诉</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = appeals.map(a => `
+    <tr>
+      <td style="color:rgba(255,255,255,.3)">${a.id}</td>
+      <td><strong style="color:#fff">${escHtml(a.username)}</strong></td>
+      <td style="color:rgba(255,255,255,.6);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(a.reason)}">${escHtml(a.reason.length > 30 ? a.reason.slice(0, 30) + '…' : a.reason)}</td>
+      <td style="color:rgba(255,255,255,.4)">${a.contact || '—'}</td>
+      <td style="color:rgba(255,255,255,.4)">${fmtDate(a.created_at)}</td>
+      <td>
+        ${a.status === 'pending' ? '<span class="badge badge-banned">待处理</span>' : ''}
+        ${a.status === 'approved' ? '<span class="badge badge-ok">已批准</span>' : ''}
+        ${a.status === 'rejected' ? '<span class="badge" style="background:rgba(233,69,96,.12);color:#ff7a91;border:1px solid rgba(233,69,96,.2);">已拒绝</span>' : ''}
+      </td>
+      <td style="color:rgba(255,255,255,.4)">${a.processed_by_name || '—'}</td>
+      <td>
+        ${a.status === 'pending' ? `
+          <button class="act-btn btn-ok" onclick="processAppeal(${a.id}, 'approve')" style="background:rgba(80,200,100,.12);color:#66dd88;">批准</button>
+          <button class="act-btn btn-del" onclick="processAppeal(${a.id}, 'reject')" style="background:rgba(233,69,96,.12);color:#ff7a91;">拒绝</button>
+        ` : ''}
+        <button class="act-btn btn-view" onclick="viewAppealDetail(${a.id})">查看</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterAppeals() {
+  const kw = document.getElementById('appeal-search').value.trim().toLowerCase();
+  const filtered = kw ? allAppeals.filter(a => 
+    a.username.toLowerCase().includes(kw) || 
+    a.reason.toLowerCase().includes(kw) ||
+    (a.contact && a.contact.toLowerCase().includes(kw))
+  ) : allAppeals;
+  renderAppeals(filtered);
+}
+
+async function processAppeal(aid, action) {
+  const actionText = action === 'approve' ? '批准' : '拒绝';
+  const reply = prompt(`${actionText}申诉，请输入回复内容（可选）：`);
+  
+  try {
+    const r = await fetch(`/api/admin/appeals/${aid}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ action: action, reply: reply || '' })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`申诉已${action === 'approve' ? '批准' : '拒绝'}`);
+      loadAppeals();
+      loadStats(); // 刷新统计数据
+    } else {
+      toast(d.msg || '操作失败', 'err');
+    }
+  } catch (e) {
+    toast('网络错误', 'err');
+  }
+}
+
+function viewAppealDetail(aid) {
+  const appeal = allAppeals.find(a => a.id === aid);
+  if (!appeal) return;
+  
+  const detail = `
+申诉详情
+
+申诉人：${appeal.username}
+提交时间：${fmtDate(appeal.created_at)}${appeal.processed_at ? '\n处理时间：' + fmtDate(appeal.processed_at) : ''}
+状态：${appeal.status === 'pending' ? '待处理' : appeal.status === 'approved' ? '已批准' : '已拒绝'}
+${appeal.processed_by_name ? '处理人：' + appeal.processed_by_name + '\n' : ''}
+
+申诉理由：
+${appeal.reason}
+
+${appeal.contact ? '联系方式：\n' + appeal.contact + '\n' : ''}
+${appeal.admin_reply ? '管理员回复：\n' + appeal.admin_reply : ''}`;
+  
+  alert(detail);
+}
+
+/* ── 标签切换（更新） ── */
+function switchTab(tab){
+  document.querySelectorAll('.sidebar-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.tab===tab);
+  });
+  document.querySelectorAll('.panel').forEach(el=>{
+    el.classList.toggle('active', el.id==='panel-'+tab);
+  });
+  if(tab==='overview') loadStats();
+  if(tab==='users')    loadUsers();
+  if(tab==='topics')   loadTopics();
+  if(tab==='security') loadSecurity();
+  if(tab==='appeals')  loadAppeals();
+}
+
+/* ── 初始化（更新） ── */
 (async()=>{
-  if(await checkAdmin()) loadStats();
+  if(await checkAdmin()) {
+    loadStats();
+    // 预加载申诉数量到概览
+    const statsR = await fetch('/api/admin/stats', { credentials: 'include' });
+    const stats = await statsR.json();
+    // 可以在这里添加申诉数量的显示
+  }
 })();
 </script>
 </body>

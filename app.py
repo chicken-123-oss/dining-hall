@@ -8,7 +8,7 @@ app.secret_key = 'wwiii_forum_secret_2026_x9k'
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-CORS(app, supports_credentials=True, origins='*', supports_credentials=True)
+CORS(app, supports_credentials=True, origins='*')
 
 DB = os.path.join(os.path.dirname(__file__), 'forum.db')
 
@@ -51,12 +51,30 @@ def init_db():
         question TEXT NOT NULL,
         answer TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS appeals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        contact TEXT,
+        status TEXT DEFAULT 'pending',
+        admin_reply TEXT,
+        created_at INTEGER DEFAULT 0,
+        processed_at INTEGER DEFAULT 0,
+        processed_by INTEGER DEFAULT NULL
+    );
     ''')
 
     c.execute('SELECT COUNT(*) FROM security_answers')
     if c.fetchone()[0] == 0:
         c.execute("INSERT INTO security_answers(question,answer) VALUES(?,?)",
                   ('世界上最伟大的动物是什么？', '猫'))
+
+    c.execute('SELECT COUNT(*) FROM appeals')
+    if c.fetchone()[0] == 0:
+        # 示例申诉数据，实际运行时会被清空
+        c.execute("INSERT INTO appeals(user_id,username,reason,contact,status,created_at) VALUES(?,?,?,?,?,?)",
+                  (2, 'testuser', '误封账号', 'test@example.com', 'pending', int(time.time()) - 86400))
 
     c.execute('SELECT COUNT(*) FROM users WHERE role="admin"')
     if c.fetchone()[0] == 0:
@@ -112,6 +130,14 @@ def admin_required(f):
 def index():
     return send_from_directory('templates', 'index.html')
 
+@app.route('/1')
+def page1():
+    return send_from_directory('templates', '1.html')
+
+@app.route('/1.txt')
+def page1_txt():
+    return send_from_directory('static', '1.txt')
+
 @app.route('/login')
 def login_page():
     return send_from_directory('templates', 'login.html')
@@ -119,6 +145,10 @@ def login_page():
 @app.route('/register')
 def register_page():
     return send_from_directory('templates', 'register.html')
+
+@app.route('/appeal')
+def appeal_page():
+    return send_from_directory('templates', 'appeal.html')
 
 @app.route('/topic/<int:tid>')
 def topic_page(tid):
@@ -181,7 +211,12 @@ def login():
     if not user:
         return jsonify({'ok': False, 'msg': '用户名或密码错误'}), 401
     if user['banned']:
-        return jsonify({'ok': False, 'msg': '账号已被封禁，请联系管理员'}), 403
+        return jsonify({
+            'ok': False, 
+            'msg': '账号已被封禁',
+            'banned': True,
+            'appeal_url': f'/appeal?username={username}'
+        }), 403
     session.permanent = True
     session['user_id'] = user['id']
     session['username'] = user['username']
@@ -221,6 +256,121 @@ def change_password():
     conn.commit()
     conn.close()
     return jsonify({'ok': True, 'msg': '密码修改成功'})
+
+# ---------- API 申诉 ----------
+@app.route('/api/appeal', methods=['POST'])
+def submit_appeal():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    reason = data.get('reason', '').strip()
+    contact = data.get('contact', '').strip()
+    
+    if not username or not reason:
+        return jsonify({'ok': False, 'msg': '请填写必要信息'}), 400
+    
+    if len(reason) > 1000:
+        return jsonify({'ok': False, 'msg': '申诉理由不能超过1000字'}), 400
+    
+    if contact and len(contact) > 100:
+        return jsonify({'ok': False, 'msg': '联系方式不能超过100字'}), 400
+    
+    conn = get_db()
+    # 检查用户是否存在且被封禁
+    user = conn.execute('SELECT id, banned FROM users WHERE username=?', (username,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+    
+    if not user['banned']:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '账号未被封禁，无需申诉'}), 400
+    
+    # 检查是否有未处理的申诉
+    existing = conn.execute(
+        'SELECT id FROM appeals WHERE username=? AND status="pending"', 
+        (username,)
+    ).fetchone()
+    
+    if existing:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '已有待处理的申诉，请耐心等待'}), 400
+    
+    # 提交申诉
+    now = int(time.time())
+    conn.execute(
+        'INSERT INTO appeals(user_id, username, reason, contact, status, created_at) VALUES(?, ?, ?, ?, ?, ?)',
+        (user['id'], username, reason, contact, 'pending', now)
+    )
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'ok': True, 'msg': '申诉提交成功，请耐心等待管理员处理'})
+
+@app.route('/api/admin/appeals', methods=['GET'])
+@admin_required
+def admin_get_appeals():
+    status_filter = request.args.get('status', 'all')
+    conn = get_db()
+    
+    query = '''
+        SELECT a.*, u.username as processed_by_name
+        FROM appeals a
+        LEFT JOIN users u ON a.processed_by = u.id
+    '''
+    params = []
+    
+    if status_filter != 'all':
+        query += ' WHERE a.status = ?'
+        params.append(status_filter)
+    
+    query += ' ORDER BY a.created_at DESC'
+    
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/admin/appeals/<int:aid>/process', methods=['POST'])
+@admin_required
+def process_appeal(aid):
+    data = request.json or {}
+    action = data.get('action')  # 'approve' or 'reject'
+    reply = data.get('reply', '').strip()
+    
+    if action not in ['approve', 'reject']:
+        return jsonify({'ok': False, 'msg': '无效的操作'}), 400
+    
+    conn = get_db()
+    appeal = conn.execute('SELECT * FROM appeals WHERE id=?', (aid,)).fetchone()
+    
+    if not appeal:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '申诉不存在'}), 404
+    
+    if appeal['status'] != 'pending':
+        conn.close()
+        return jsonify({'ok': False, 'msg': '申诉已处理'}), 400
+    
+    new_status = 'approved' if action == 'approve' else 'rejected'
+    now = int(time.time())
+    
+    # 更新申诉状态
+    conn.execute(
+        'UPDATE appeals SET status=?, admin_reply=?, processed_at=?, processed_by=? WHERE id=?',
+        (new_status, reply, now, session['user_id'], aid)
+    )
+    
+    # 如果批准申诉，解封账号
+    if action == 'approve':
+        conn.execute(
+            'UPDATE users SET banned=0 WHERE username=?',
+            (appeal['username'],)
+        )
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'ok': True, 'msg': f'申诉已{new_status == "approved" and "批准" or "拒绝"}'})
 
 @app.route('/api/stats', methods=['GET'])
 def public_stats():
