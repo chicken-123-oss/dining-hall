@@ -233,24 +233,56 @@
     </div>
 
     <script>
-        // 从URL参数获取用户名
-        const urlParams = new URLSearchParams(window.location.search);
-        const username = urlParams.get('username');
-        
-        if (username) {
-            document.getElementById('appealUsername').value = username;
-        } else {
-            // 如果没有用户名参数，尝试从本地存储获取
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        // 初始化：获取用户名，优先级：URL参数 > /api/me > localStorage
+        async function initUsername() {
+            // 1. 先看 URL 参数（被封用户从登录页跳转来时携带）
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUsername = urlParams.get('username');
+            if (urlUsername) {
+                document.getElementById('appealUsername').value = urlUsername;
+                return;
+            }
+
+            // 2. 尝试调用 /api/me 获取已登录用户信息
+            try {
+                const res = await fetch('/api/me', { credentials: 'include' });
+                const data = await res.json();
+                if (data.ok && data.username) {
+                    document.getElementById('appealUsername').value = data.username;
+                    return;
+                }
+            } catch (e) {
+                // 网络问题，继续尝试下一步
+            }
+
+            // 3. 回退到 localStorage
             const savedUsername = localStorage.getItem('username');
             if (savedUsername) {
                 document.getElementById('appealUsername').value = savedUsername;
-            } else {
-                showToast('无法获取用户信息，请先登录', 'error');
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 2000);
+                return;
             }
+
+            // 4. 全部失败，才提示并跳转登录
+            showToast('无法获取用户信息，请先登录', 'error');
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
         }
+
+        initUsername();
 
         // 字符计数
         const reasonTextarea = document.getElementById('appealReason');
@@ -337,19 +369,6 @@
                 submitBtn.textContent = '提交申诉';
             }
         });
-
-        function showToast(message, type) {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-
-            setTimeout(() => toast.classList.add('show'), 100);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => document.body.removeChild(toast), 300);
-            }, 3000);
-        }
     </script>
 </body>
 </html>
