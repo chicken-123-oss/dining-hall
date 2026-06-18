@@ -198,7 +198,8 @@
         <form id="appealForm">
             <div class="form-group">
                 <label class="form-label required">申诉账号</label>
-                <input type="text" class="form-input" id="appealUsername" readonly>
+                <input type="text" class="form-input" id="appealUsername" placeholder="请输入被封禁的账号用户名">
+                <div id="username-hint" style="font-size:12px;color:#999;margin-top:5px;display:none;"></div>
             </div>
 
             <div class="form-group">
@@ -246,13 +247,19 @@
             }, 3000);
         }
 
-        // 初始化：获取用户名，优先级：URL参数 > /api/me > localStorage
+        // 初始化：获取用户名，优先级：URL参数 > /api/me > localStorage > 手动输入
         async function initUsername() {
+            const input = document.getElementById('appealUsername');
+            const hint = document.getElementById('username-hint');
+
             // 1. 先看 URL 参数（被封用户从登录页跳转来时携带）
             const urlParams = new URLSearchParams(window.location.search);
             const urlUsername = urlParams.get('username');
             if (urlUsername) {
-                document.getElementById('appealUsername').value = urlUsername;
+                input.value = decodeURIComponent(urlUsername);
+                input.readOnly = true;
+                input.style.background = '#f0f0f0';
+                input.title = '账号由登录页自动填入';
                 return;
             }
 
@@ -261,7 +268,9 @@
                 const res = await fetch('/api/me', { credentials: 'include' });
                 const data = await res.json();
                 if (data.ok && data.username) {
-                    document.getElementById('appealUsername').value = data.username;
+                    input.value = data.username;
+                    hint.textContent = '已自动填入当前登录账号，如需申诉其他账号可修改';
+                    hint.style.display = 'block';
                     return;
                 }
             } catch (e) {
@@ -271,15 +280,15 @@
             // 3. 回退到 localStorage
             const savedUsername = localStorage.getItem('username');
             if (savedUsername) {
-                document.getElementById('appealUsername').value = savedUsername;
+                input.value = savedUsername;
+                hint.textContent = '已自动填入账号，如有误请手动修改';
+                hint.style.display = 'block';
                 return;
             }
 
-            // 4. 全部失败，才提示并跳转登录
-            showToast('无法获取用户信息，请先登录', 'error');
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 2000);
+            // 4. 无法自动获取，让用户手动输入
+            hint.textContent = '未检测到登录状态，请手动输入您的账号用户名';
+            hint.style.display = 'block';
         }
 
         initUsername();

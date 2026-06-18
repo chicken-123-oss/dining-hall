@@ -65,6 +65,17 @@ def init_db():
     );
     ''')
 
+    # 数据迁移：添加功能限制字段（兼容旧数据库）
+    for migration_sql in [
+        'ALTER TABLE users ADD COLUMN can_post INTEGER DEFAULT 1',
+        'ALTER TABLE users ADD COLUMN can_reply INTEGER DEFAULT 1',
+    ]:
+        try:
+            c.execute(migration_sql)
+        except Exception:
+            pass  # 列已存在，忽略
+    conn.commit()
+
     c.execute('SELECT COUNT(*) FROM security_answers')
     if c.fetchone()[0] == 0:
         c.execute("INSERT INTO security_answers(question,answer) VALUES(?,?)",
@@ -232,8 +243,17 @@ def logout():
 def me():
     if 'user_id' not in session:
         return jsonify({'ok': False, 'msg': '未登录'}), 401
-    return jsonify({'ok': True, 'id': session['user_id'],
-                    'username': session['username'], 'role': session['role']})
+    conn = get_db()
+    u = conn.execute('SELECT can_post, can_reply FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    conn.close()
+    return jsonify({
+        'ok': True,
+        'id': session['user_id'],
+        'username': session['username'],
+        'role': session['role'],
+        'can_post': (u['can_post'] if u['can_post'] is not None else 1) if u else 1,
+        'can_reply': (u['can_reply'] if u['can_reply'] is not None else 1) if u else 1,
+    })
 
 @app.route('/api/me/password', methods=['PUT'])
 @login_required
@@ -434,6 +454,11 @@ def create_topic():
     if len(title) > 80:
         return jsonify({'ok': False, 'msg': '标题不超过80个字符'}), 400
     conn = get_db()
+    # 检查发帖限制
+    u = conn.execute('SELECT can_post FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    if u and u['can_post'] == 0:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '您的账号已被限制发帖功能，如有疑问请联系管理员'}), 403
     cur = conn.execute('INSERT INTO topics(title,description,author_id,created_at) VALUES(?,?,?,?)',
                  (title, desc, session['user_id'], int(time.time())))
     new_id = cur.lastrowid
@@ -500,6 +525,11 @@ def create_post(tid):
     if len(content) > 2000:
         return jsonify({'ok': False, 'msg': '内容不能超过2000字'}), 400
     conn = get_db()
+    # 检查回复限制
+    u = conn.execute('SELECT can_reply FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    if u and u['can_reply'] == 0:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '您的账号已被限制回复功能，如有疑问请联系管理员'}), 403
     topic = conn.execute('SELECT id FROM topics WHERE id=?', (tid,)).fetchone()
     if not topic:
         conn.close()
@@ -537,6 +567,8 @@ def admin_users():
     conn = get_db()
     rows = conn.execute('''
         SELECT u.id, u.username, u.role, u.created_at, u.banned,
+               COALESCE(u.can_post, 1) as can_post,
+               COALESCE(u.can_reply, 1) as can_reply,
                (SELECT COUNT(*) FROM posts p WHERE p.author_id=u.id) as post_count
         FROM users u ORDER BY u.id
     ''').fetchall()
@@ -573,6 +605,27 @@ def ban_user(uid):
     conn.commit()
     conn.close()
     return jsonify({'ok': True, 'banned': new_ban})
+
+@app.route('/api/admin/users/<int:uid>/restrict', methods=['POST'])
+@admin_required
+def restrict_user(uid):
+    if uid == session['user_id']:
+        return jsonify({'ok': False, 'msg': '不能限制自己'}), 400
+    data = request.json or {}
+    can_post = 1 if data.get('can_post', 1) else 0
+    can_reply = 1 if data.get('can_reply', 1) else 0
+    conn = get_db()
+    user = conn.execute('SELECT role FROM users WHERE id=?', (uid,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+    if user['role'] == 'admin':
+        conn.close()
+        return jsonify({'ok': False, 'msg': '不能限制管理员'}), 400
+    conn.execute('UPDATE users SET can_post=?, can_reply=? WHERE id=?', (can_post, can_reply, uid))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'can_post': can_post, 'can_reply': can_reply})
 
 @app.route('/api/admin/users/<int:uid>', methods=['DELETE'])
 @admin_required

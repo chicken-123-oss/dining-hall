@@ -129,6 +129,21 @@ for(let i=0;i<60;i++){
 const msgEl=document.getElementById('msg');
 function showMsg(text,type){msgEl.className='msg-box '+type;msgEl.textContent=text;}
 
+function showBannedMsg(appealUrl){
+  msgEl.className='msg-box err';
+  msgEl.textContent='';
+  const span=document.createElement('span');
+  span.textContent='账号已被封禁 — ';
+  const link=document.createElement('a');
+  link.href=appealUrl;
+  link.textContent='点击此处提交申诉 →';
+  link.style.cssText='color:#ffaa44;font-weight:700;text-decoration:none;';
+  link.onmouseenter=()=>link.style.textDecoration='underline';
+  link.onmouseleave=()=>link.style.textDecoration='none';
+  msgEl.appendChild(span);
+  msgEl.appendChild(link);
+}
+
 async function doLogin(){
   const username=document.getElementById('username').value.trim();
   const password=document.getElementById('password').value;
@@ -146,7 +161,11 @@ async function doLogin(){
       showMsg('登录成功，正在跳转…','ok');
       setTimeout(()=>{location.href=data.role==='admin'?'/admin':'/';},600);
     }else{
-      showMsg(data.msg||'登录失败','err');
+      if(data.banned){
+        showBannedMsg(data.appeal_url||('/appeal?username='+encodeURIComponent(username)));
+      }else{
+        showMsg(data.msg||'登录失败','err');
+      }
       btn.textContent='进入战场';btn.disabled=false;
     }
   }catch(e){

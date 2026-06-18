@@ -414,6 +414,31 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
   </div>
 </div>
 
+<!-- 功能限制 Modal -->
+<div class="overlay" id="restrict-overlay" onclick="if(event.target===this)closeRestrictModal()">
+  <div class="modal">
+    <h3>⚠️ 功能限制设置</h3>
+    <div class="modal-sub">对用户 <strong id="restrict-uname"></strong> 进行部分功能限制（不影响登录）</div>
+    <div class="modal-field" style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:rgba(255,255,255,.75);font-size:14px;letter-spacing:0;font-weight:400;">
+        <input type="checkbox" id="restrict-post" style="width:16px;height:16px;cursor:pointer;accent-color:#e94560;flex-shrink:0;">
+        <span>禁止发帖 <span style="color:rgba(255,255,255,.35);font-size:12px;">（不允许创建新话题）</span></span>
+      </label>
+    </div>
+    <div class="modal-field" style="margin-bottom:22px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:rgba(255,255,255,.75);font-size:14px;letter-spacing:0;font-weight:400;">
+        <input type="checkbox" id="restrict-reply" style="width:16px;height:16px;cursor:pointer;accent-color:#e94560;flex-shrink:0;">
+        <span>禁止回复 <span style="color:rgba(255,255,255,.35);font-size:12px;">（不允许在话题中发言）</span></span>
+      </label>
+    </div>
+    <div class="modal-err" id="restrict-err"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeRestrictModal()">取消</button>
+      <button class="btn-confirm" id="restrict-btn" onclick="submitRestrict()">保存设置</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let allUsers=[], allTopics=[];
 
@@ -472,13 +497,16 @@ function renderUsers(users){
       <td><strong style="color:#fff">${escHtml(u.username)}</strong></td>
       <td><span class="badge badge-${u.role==='admin'?'admin':'user'}">${u.role==='admin'?'管理员':'普通用户'}</span></td>
       <td style="color:rgba(255,255,255,.4)">${fmtDate(u.created_at)}</td>
-      <td>${u.banned
-        ?'<span class="badge badge-banned">封禁中</span>'
-        :'<span class="badge badge-ok">正常</span>'}</td>
+      <td>
+        ${u.banned?'<span class="badge badge-banned">封禁中</span>':'<span class="badge badge-ok">正常</span>'}
+        ${(u.can_post??1)==0?'<span class="badge" style="margin-left:3px;background:rgba(255,120,50,.1);color:#ff9966;border:1px solid rgba(255,120,50,.18);font-size:11px;">限发帖</span>':''}
+        ${(u.can_reply??1)==0?'<span class="badge" style="margin-left:3px;background:rgba(255,120,50,.1);color:#ff9966;border:1px solid rgba(255,120,50,.18);font-size:11px;">限回复</span>':''}
+      </td>
       <td style="color:rgba(255,255,255,.4)">${u.post_count||0}</td>
       <td>
         ${u.role!=='admin'?`
           <button class="act-btn ${u.banned?'btn-unban':'btn-ban'}" onclick="toggleBan(${u.id})">${u.banned?'解封':'封禁'}</button>
+          <button class="act-btn" onclick="openRestrictModal(${u.id},'${escHtml(u.username)}',${u.can_post??1},${u.can_reply??1})" style="background:rgba(255,165,0,.12);color:#ffcc44;border:1px solid rgba(255,165,0,.2);">限制</button>
           <button class="act-btn btn-pwd" onclick="openResetPwd(${u.id},'${escHtml(u.username)}')">重置密码</button>
           <button class="act-btn btn-del" onclick="delUser(${u.id})">删除</button>
         `:'<span style="color:rgba(255,255,255,.2);font-size:12px">受保护</span>'}
@@ -680,10 +708,61 @@ async function changeAdminPwd() {
   } catch(e) { showMsg('网络错误，请重试', false); }
 }
 
+/* ── 功能限制 Modal ── */
+let restrictUid = null;
+
+function openRestrictModal(uid, uname, canPost, canReply) {
+  restrictUid = uid;
+  document.getElementById('restrict-uname').textContent = uname;
+  document.getElementById('restrict-post').checked = (canPost == 0);
+  document.getElementById('restrict-reply').checked = (canReply == 0);
+  const errEl = document.getElementById('restrict-err');
+  errEl.style.display = 'none'; errEl.textContent = '';
+  document.getElementById('restrict-overlay').classList.add('show');
+}
+
+function closeRestrictModal() {
+  document.getElementById('restrict-overlay').classList.remove('show');
+  restrictUid = null;
+}
+
+async function submitRestrict() {
+  const canPost = document.getElementById('restrict-post').checked ? 0 : 1;
+  const canReply = document.getElementById('restrict-reply').checked ? 0 : 1;
+  const btn = document.getElementById('restrict-btn');
+  const errEl = document.getElementById('restrict-err');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const r = await fetch(`/api/admin/users/${restrictUid}/restrict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ can_post: canPost, can_reply: canReply })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      closeRestrictModal();
+      const labels = [];
+      if (canPost === 0) labels.push('限制发帖');
+      if (canReply === 0) labels.push('限制回复');
+      toast(labels.length ? ('已设置：' + labels.join('、')) : '已解除所有功能限制');
+      loadUsers();
+    } else {
+      errEl.textContent = d.msg || '操作失败';
+      errEl.style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent = '网络错误，请重试';
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false; btn.textContent = '保存设置';
+}
+
 /* ── 键盘支持 ── */
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeResetPwd();
+  if (e.key === 'Escape') { closeResetPwd(); closeRestrictModal(); }
   if (e.key === 'Enter' && document.getElementById('reset-pwd-overlay').classList.contains('show')) submitResetPwd();
+  if (e.key === 'Enter' && document.getElementById('restrict-overlay').classList.contains('show')) submitRestrict();
 });
 
 /* ── 工具 ── */
