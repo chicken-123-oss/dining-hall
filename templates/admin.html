@@ -384,7 +384,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
       </div>
       <div class="form-section">
         <h3>ℹ️ 默认管理员账号</h3>
-        <p>初始管理员：<strong style="color:#e94560">admin</strong> / <strong style="color:#e94560">admin888</strong>，请登录后尽快修改密码（当前版本无密码修改界面，可直接修改数据库）。</p>
+        <p>初始管理员：<strong style="color:#e94560">admin</strong> / <strong style="color:#e94560">admin888</strong>，请通过上方「修改管理员密码」功能尽快更换密码。</p>
       </div>
     </div>
 
@@ -453,19 +453,7 @@ async function checkAdmin(){
   }catch(e){location.href='/login';return false;}
 }
 
-/* ── 标签切换 ── */
-function switchTab(tab){
-  document.querySelectorAll('.sidebar-item').forEach(el=>{
-    el.classList.toggle('active', el.dataset.tab===tab);
-  });
-  document.querySelectorAll('.panel').forEach(el=>{
-    el.classList.toggle('active', el.id==='panel-'+tab);
-  });
-  if(tab==='overview') loadStats();
-  if(tab==='users')    loadUsers();
-  if(tab==='topics')   loadTopics();
-  if(tab==='security') loadSecurity();
-}
+/* switchTab 定义见下方「标签切换（更新）」区 */
 
 /* ── 概览 ── */
 async function loadStats(){
