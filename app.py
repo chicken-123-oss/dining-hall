@@ -74,6 +74,11 @@ def init_db():
             c.execute(migration_sql)
         except Exception:
             pass  # 列已存在，忽略
+    # 迁移：申诉类型字段
+    try:
+        c.execute('ALTER TABLE appeals ADD COLUMN appeal_type TEXT DEFAULT "ban"')
+    except Exception:
+        pass
     conn.commit()
 
     c.execute('SELECT COUNT(*) FROM security_answers')
@@ -303,31 +308,37 @@ def submit_appeal():
         return jsonify({'ok': False, 'msg': '联系方式不能超过100字'}), 400
     
     conn = get_db()
-    # 检查用户是否存在且被封禁
-    user = conn.execute('SELECT id, banned FROM users WHERE username=?', (username,)).fetchone()
+    # 检查用户是否存在且被封禁或功能受限
+    user = conn.execute('SELECT id, banned, can_post, can_reply FROM users WHERE username=?', (username,)).fetchone()
     if not user:
         conn.close()
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
     
-    if not user['banned']:
+    # 判断申诉类型
+    appeal_type = 'ban'
+    if user['banned']:
+        appeal_type = 'ban'
+    elif user['can_post'] == 0 or user['can_reply'] == 0:
+        appeal_type = 'restrict'
+    else:
         conn.close()
-        return jsonify({'ok': False, 'msg': '账号未被封禁，无需申诉'}), 400
+        return jsonify({'ok': False, 'msg': '账号状态正常，无需申诉'}), 400
     
-    # 检查是否有未处理的申诉
+    # 检查是否有同类型未处理的申诉
     existing = conn.execute(
-        'SELECT id FROM appeals WHERE username=? AND status="pending"', 
-        (username,)
+        'SELECT id FROM appeals WHERE username=? AND status="pending" AND appeal_type=?', 
+        (username, appeal_type)
     ).fetchone()
     
     if existing:
         conn.close()
-        return jsonify({'ok': False, 'msg': '已有待处理的申诉，请耐心等待'}), 400
+        return jsonify({'ok': False, 'msg': f'已有待处理的{appeal_type == "ban" and "封禁" or "功能限制"}申诉，请耐心等待'}), 400
     
     # 提交申诉
     now = int(time.time())
     conn.execute(
-        'INSERT INTO appeals(user_id, username, reason, contact, status, created_at) VALUES(?, ?, ?, ?, ?, ?)',
-        (user['id'], username, reason, contact, 'pending', now)
+        'INSERT INTO appeals(user_id, username, reason, contact, status, appeal_type, created_at) VALUES(?, ?, ?, ?, ?, ?, ?)',
+        (user['id'], username, reason, contact, 'pending', appeal_type, now)
     )
     conn.commit()
     conn.close()
@@ -388,17 +399,39 @@ def process_appeal(aid):
         (new_status, reply, now, session['user_id'], aid)
     )
     
-    # 如果批准申诉，解封账号
+    # 批准申诉时，根据申诉类型恢复权限
     if action == 'approve':
-        conn.execute(
-            'UPDATE users SET banned=0 WHERE username=?',
-            (appeal['username'],)
-        )
+        appeal_type = appeal['appeal_type'] if 'appeal_type' in appeal.keys() else 'ban'
+        if appeal_type == 'restrict':
+            # 功能限制申诉：恢复所有功能权限
+            conn.execute(
+                'UPDATE users SET can_post=1, can_reply=1 WHERE username=?',
+                (appeal['username'],)
+            )
+        else:
+            # 封禁申诉：解封账号
+            conn.execute(
+                'UPDATE users SET banned=0 WHERE username=?',
+                (appeal['username'],)
+            )
     
     conn.commit()
     conn.close()
     
     return jsonify({'ok': True, 'msg': f'申诉已{new_status == "approved" and "批准" or "拒绝"}'})
+
+@app.route('/api/my_appeals', methods=['GET'])
+@login_required
+def my_appeals():
+    """当前用户查看自己的申诉记录与结果"""
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT id, reason, contact, status, admin_reply, appeal_type, created_at, processed_at '
+        'FROM appeals WHERE user_id=? ORDER BY created_at DESC LIMIT 5',
+        (session['user_id'],)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 @app.route('/api/stats', methods=['GET'])
 def public_stats():
@@ -467,7 +500,7 @@ def create_topic():
         u = conn.execute('SELECT can_post FROM users WHERE id=?', (session['user_id'],)).fetchone()
         if u and u['can_post'] == 0:
             conn.close()
-            return jsonify({'ok': False, 'msg': '您的账号已被限制发帖功能，如有疑问请联系管理员'}), 403
+            return jsonify({'ok': False, 'msg': '您的账号已被限制发帖功能，可前往 /appeal 提交申诉'}), 403
     except Exception:
         pass  # 数据库缺少列，允许发帖
     cur = conn.execute('INSERT INTO topics(title,description,author_id,created_at) VALUES(?,?,?,?)',
@@ -541,7 +574,7 @@ def create_post(tid):
         u = conn.execute('SELECT can_reply FROM users WHERE id=?', (session['user_id'],)).fetchone()
         if u and u['can_reply'] == 0:
             conn.close()
-            return jsonify({'ok': False, 'msg': '您的账号已被限制回复功能，如有疑问请联系管理员'}), 403
+            return jsonify({'ok': False, 'msg': '您的账号已被限制回复功能，可前往 /appeal 提交申诉'}), 403
     except Exception:
         pass  # 数据库缺少列，允许回复
     topic = conn.execute('SELECT id FROM topics WHERE id=?', (tid,)).fetchone()

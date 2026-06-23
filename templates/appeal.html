@@ -182,17 +182,70 @@
         .toast.error {
             background: #e74c3c;
         }
+
+        /* 申诉结果 */
+        .result-section {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e8e8e8;
+        }
+        .result-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            border-left: 4px solid #e0e0e0;
+        }
+        .result-card.pending { border-left-color: #ffa726; }
+        .result-card.approved { border-left-color: #66bb6a; }
+        .result-card.rejected { border-left-color: #ef5350; }
+        .result-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .result-type {
+            font-size: 12px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .result-type.ban { background: #ffebee; color: #c62828; }
+        .result-type.restrict { background: #fff3e0; color: #e65100; }
+        .result-status {
+            font-size: 12px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .result-status.pending { background: #fff8e1; color: #f57f17; }
+        .result-status.approved { background: #e8f5e9; color: #2e7d32; }
+        .result-status.rejected { background: #ffebee; color: #c62828; }
+        .result-reason { font-size: 14px; color: #555; margin: 8px 0; line-height: 1.5; }
+        .result-reply { font-size: 13px; color: #333; margin-top: 8px; padding: 10px 14px; background: #fff; border-radius: 8px; line-height: 1.5; }
+        .result-reply strong { color: #667eea; }
+        .result-time { font-size: 12px; color: #999; }
+        .no-results { text-align: center; color: #999; font-size: 14px; padding: 20px; }
     </style>
 </head>
 <body>
     <div class="appeal-container">
         <div class="appeal-header">
             <h1 class="appeal-title">📢 账号申诉</h1>
-            <p class="appeal-subtitle">如果您的账号被误封，请在此提交申诉，管理员会尽快处理</p>
+            <p class="appeal-subtitle">如果您的账号被封禁或功能受限（禁止发帖/回复），请在此提交申诉，管理员会尽快处理</p>
         </div>
 
         <div class="warning-box">
-            <strong>注意：</strong>只有被封禁的账号才能提交申诉。请确保您填写的信息真实有效，虚假申诉可能会导致永久封禁。
+            <strong>注意：</strong>只有被封禁或功能受限的账号才能提交申诉。请确保您填写的信息真实有效，虚假申诉可能会导致永久封禁。
         </div>
 
         <form id="appealForm">
@@ -227,6 +280,12 @@
 
             <button type="submit" class="submit-btn" id="submitBtn">提交申诉</button>
         </form>
+
+        <!-- 申诉结果 -->
+        <div class="result-section" id="resultSection" style="display:none;">
+            <div class="result-title">📋 我的申诉记录</div>
+            <div id="resultsContainer"></div>
+        </div>
 
         <div class="back-link">
             <a href="/login">← 返回登录页</a>
@@ -378,6 +437,47 @@
                 submitBtn.textContent = '提交申诉';
             }
         });
+
+        // 加载申诉记录
+        async function loadMyAppeals() {
+            try {
+                const res = await fetch('/api/my_appeals', { credentials: 'include' });
+                const data = await res.json();
+                if (!data || !data.length) return;
+                
+                const section = document.getElementById('resultSection');
+                const container = document.getElementById('resultsContainer');
+                section.style.display = 'block';
+                
+                container.innerHTML = data.map(a => {
+                    const typeLabel = a.appeal_type === 'restrict' ? '功能限制' : '封禁';
+                    const typeClass = a.appeal_type === 'restrict' ? 'restrict' : 'ban';
+                    const statusLabel = a.status === 'pending' ? '待处理' : a.status === 'approved' ? '已批准' : '已拒绝';
+                    const d = new Date(a.created_at * 1000);
+                    const timeStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    
+                    let replyHtml = '';
+                    if (a.status !== 'pending' && a.admin_reply) {
+                        replyHtml = `<div class="result-reply"><strong>管理员回复：</strong>${esc(a.admin_reply)}</div>`;
+                    }
+                    
+                    return `<div class="result-card ${a.status}">
+                        <div class="result-card-header">
+                            <span class="result-type ${typeClass}">${typeLabel}申诉</span>
+                            <span class="result-status ${a.status}">${statusLabel}</span>
+                            <span class="result-time">${timeStr}</span>
+                        </div>
+                        <div class="result-reason">${esc(a.reason)}</div>
+                        ${replyHtml}
+                        ${a.status === 'approved' ? '<div style="color:#2e7d32;font-size:13px;margin-top:6px;">✓ 申诉已通过，相关限制已解除</div>' : ''}
+                    </div>`;
+                }).join('');
+            } catch(e) {}
+        }
+        
+        function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        
+        loadMyAppeals();
     </script>
 </body>
 </html>

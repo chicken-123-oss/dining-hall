@@ -311,7 +311,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
     <div class="panel" id="panel-appeals">
       <div class="page-header">
         <h2>账号申诉管理</h2>
-        <p>处理用户的账号封禁申诉请求</p>
+        <p>处理用户的账号封禁及功能限制申诉请求</p>
       </div>
       
       <div class="search-bar">
@@ -320,6 +320,11 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
           <option value="pending">待处理</option>
           <option value="approved">已批准</option>
           <option value="rejected">已拒绝</option>
+        </select>
+        <select id="appeal-type-filter" onchange="filterAppeals()" style="padding:9px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font-size:14px;outline:none;">
+          <option value="all">全部类型</option>
+          <option value="ban">封禁申诉</option>
+          <option value="restrict">功能限制申诉</option>
         </select>
         <input type="text" id="appeal-search" placeholder="搜索用户名或申诉理由…" oninput="filterAppeals()" style="padding:9px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#fff;font-size:14px;outline:none;width:280px;">
       </div>
@@ -330,6 +335,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
             <tr>
               <th>ID</th>
               <th>申诉人</th>
+              <th>类型</th>
               <th>申诉理由</th>
               <th>联系方式</th>
               <th>提交时间</th>
@@ -339,7 +345,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025);}
             </tr>
           </thead>
           <tbody id="appeals-tbody">
-            <tr class="empty-row"><td colspan="8">加载中…</td></tr>
+            <tr class="empty-row"><td colspan="9">加载中…</td></tr>
           </tbody>
         </table>
       </div>
@@ -809,14 +815,19 @@ async function loadAppeals() {
 function renderAppeals(appeals) {
   const tbody = document.getElementById('appeals-tbody');
   if (!appeals.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">暂无申诉</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">暂无申诉</td></tr>';
     return;
   }
   
-  tbody.innerHTML = appeals.map(a => `
+  tbody.innerHTML = appeals.map(a => {
+    const typeLabel = a.appeal_type === 'restrict' 
+      ? '<span class="badge" style="background:rgba(255,165,0,.12);color:#ffaa44;border:1px solid rgba(255,165,0,.2);">功能限制</span>'
+      : '<span class="badge badge-banned">封禁</span>';
+    return `
     <tr>
       <td style="color:rgba(255,255,255,.3)">${a.id}</td>
       <td><strong style="color:#fff">${escHtml(a.username)}</strong></td>
+      <td>${typeLabel}</td>
       <td style="color:rgba(255,255,255,.6);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(a.reason)}">${escHtml(a.reason.length > 30 ? a.reason.slice(0, 30) + '…' : a.reason)}</td>
       <td style="color:rgba(255,255,255,.4)">${a.contact || '—'}</td>
       <td style="color:rgba(255,255,255,.4)">${fmtDate(a.created_at)}</td>
@@ -834,16 +845,24 @@ function renderAppeals(appeals) {
         <button class="act-btn btn-view" onclick="viewAppealDetail(${a.id})">查看</button>
       </td>
     </tr>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function filterAppeals() {
   const kw = document.getElementById('appeal-search').value.trim().toLowerCase();
-  const filtered = kw ? allAppeals.filter(a => 
-    a.username.toLowerCase().includes(kw) || 
-    a.reason.toLowerCase().includes(kw) ||
-    (a.contact && a.contact.toLowerCase().includes(kw))
-  ) : allAppeals;
+  const typeFilter = document.getElementById('appeal-type-filter').value;
+  let filtered = allAppeals;
+  if (typeFilter !== 'all') {
+    filtered = filtered.filter(a => a.appeal_type === typeFilter);
+  }
+  if (kw) {
+    filtered = filtered.filter(a => 
+      a.username.toLowerCase().includes(kw) || 
+      a.reason.toLowerCase().includes(kw) ||
+      (a.contact && a.contact.toLowerCase().includes(kw))
+    );
+  }
   renderAppeals(filtered);
 }
 
@@ -875,19 +894,21 @@ function viewAppealDetail(aid) {
   const appeal = allAppeals.find(a => a.id === aid);
   if (!appeal) return;
   
-  const detail = `
-申诉详情
+  const typeLabel = appeal.appeal_type === 'restrict' ? '功能限制申诉' : '封禁申诉';
+  const statusLabel = appeal.status === 'pending' ? '待处理' : appeal.status === 'approved' ? '已批准' : '已拒绝';
+  
+  const detail = `申诉详情
+类型：${typeLabel}
 
 申诉人：${appeal.username}
 提交时间：${fmtDate(appeal.created_at)}${appeal.processed_at ? '\n处理时间：' + fmtDate(appeal.processed_at) : ''}
-状态：${appeal.status === 'pending' ? '待处理' : appeal.status === 'approved' ? '已批准' : '已拒绝'}
+状态：${statusLabel}
 ${appeal.processed_by_name ? '处理人：' + appeal.processed_by_name + '\n' : ''}
 
 申诉理由：
 ${appeal.reason}
 
-${appeal.contact ? '联系方式：\n' + appeal.contact + '\n' : ''}
-${appeal.admin_reply ? '管理员回复：\n' + appeal.admin_reply : ''}`;
+${appeal.contact ? '联系方式：\n' + appeal.contact + '\n' : ''}${appeal.admin_reply ? '管理员回复：\n' + appeal.admin_reply : ''}`;
   
   alert(detail);
 }

@@ -170,9 +170,28 @@ body{background:#0d0d1a;color:#e0e0e0;font-family:'Microsoft YaHei',system-ui,sa
   border-radius:16px;height:88px;margin-bottom:10px;
 }
 @keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* RESTRICT BANNER */
+.limit-banner{
+  background:linear-gradient(135deg,rgba(255,165,0,.12),rgba(255,140,0,.06));
+  border-bottom:1px solid rgba(255,165,0,.2);
+  padding:12px 40px;text-align:center;display:none;
+  font-size:14px;color:#ffaa44;backdrop-filter:blur(8px);
+}
+.limit-banner a{color:#ffcc66;font-weight:700;text-decoration:underline;margin:0 6px;}
+.limit-banner a:hover{color:#ffe0a0;}
+.limit-banner .close-banner{
+  float:right;cursor:pointer;color:rgba(255,255,255,.3);font-size:18px;line-height:1;
+}
+.limit-banner .close-banner:hover{color:#fff;}
 </style>
 </head>
 <body>
+
+<div class="limit-banner" id="limit-banner">
+  <span class="close-banner" onclick="document.getElementById('limit-banner').style.display='none'">✕</span>
+  <span id="limit-text"></span>
+</div>
 
 <nav class="nav">
   <div class="nav-logo" onclick="location.href='/'">⚔️ 第四次世界大战</div>
@@ -239,6 +258,19 @@ async function init(){
       document.getElementById('btn-login').style.display='none';
       document.getElementById('btn-create').style.display='';
       if(d.role==='admin') document.getElementById('btn-admin').style.display='';
+
+      // 功能限制提醒
+      const postDisabled = d.can_post === 0, replyDisabled = d.can_reply === 0;
+      if(postDisabled || replyDisabled){
+        const types = [];
+        if(postDisabled) types.push('发帖');
+        if(replyDisabled) types.push('回复');
+        const b = document.getElementById('limit-banner');
+        b.style.display = 'block';
+        b.querySelector('#limit-text').innerHTML = 
+          `⚠️ 您的账号已被限制${types.join('和')}功能 <a href="/appeal">提交申诉 ›</a> <a href="javascript:void(0)" onclick="loadMyAppealsBanner()">查看申诉结果 ›</a>`;
+        loadMyAppealsBanner();
+      }
     }
   }catch(e){}
   loadTopics();
@@ -341,6 +373,29 @@ function formatTime(ts){
   if(diff<86400)return Math.floor(diff/3600)+'小时前';
   if(diff<86400*30)return Math.floor(diff/86400)+'天前';
   return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+}
+
+// 加载申诉结果到限制横幅中
+async function loadMyAppealsBanner(){
+  try{
+    const res = await fetch('/api/my_appeals', { credentials: 'include' });
+    const data = await res.json();
+    if(!data||!data.length) return;
+    const pending = data.find(a=>a.status==='pending');
+    const last = data[0]; // 最近一条
+    const b = document.getElementById('limit-banner');
+    const textEl = b.querySelector('#limit-text');
+    
+    if(pending){
+      // 显示待处理提醒
+      textEl.innerHTML += ' <span style="font-size:12px;color:rgba(255,255,255,.5);">(申诉待处理中...)</span>';
+    } else if(last && last.status !== 'pending') {
+      // 显示最近结果
+      const statusText = last.status === 'approved' ? '✓ 已批准，功能已恢复' : '✗ 已拒绝';
+      const statusColor = last.status === 'approved' ? '#66dd88' : '#ff7a91';
+      textEl.innerHTML += ` <span style="font-size:12px;color:${statusColor};">(${statusText})</span>`;
+    }
+  }catch(e){}
 }
 
 init();
