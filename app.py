@@ -291,6 +291,55 @@ def change_password():
     return jsonify({'ok': True, 'msg': '密码修改成功'})
 
 # ---------- API 申诉 ----------
+@app.route('/api/check_status', methods=['GET'])
+def check_user_status():
+    """检测用户当前封禁/限制状态，供申诉页面自动识别封禁类型"""
+    username = request.args.get('username', '').strip()
+    if not username:
+        return jsonify({'ok': False, 'msg': '请提供用户名'}), 400
+    conn = get_db()
+    # 防御性查询：兼容旧数据库无 can_post/can_reply 列
+    user = conn.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
+    conn.close()
+    if not user:
+        return jsonify({'ok': False, 'msg': '用户不存在'}), 404
+
+    banned = user.get('banned') or 0
+    can_post = 1
+    can_reply = 1
+    try:
+        can_post = user['can_post'] if user['can_post'] is not None else 1
+    except Exception:
+        pass
+    try:
+        can_reply = user['can_reply'] if user['can_reply'] is not None else 1
+    except Exception:
+        pass
+    
+    if banned:
+        appeal_type = 'ban'
+        type_label = '账号封禁'
+    elif can_post == 0 or can_reply == 0:
+        appeal_type = 'restrict'
+        parts = []
+        if can_post == 0:
+            parts.append('禁止发帖')
+        if can_reply == 0:
+            parts.append('禁止回复')
+        type_label = '功能限制（' + '、'.join(parts) + '）'
+    else:
+        appeal_type = 'none'
+        type_label = '账号状态正常'
+    
+    return jsonify({
+        'ok': True,
+        'appeal_type': appeal_type,
+        'type_label': type_label,
+        'banned': banned,
+        'can_post': can_post,
+        'can_reply': can_reply
+    })
+
 @app.route('/api/appeal', methods=['POST'])
 def submit_appeal():
     data = request.json or {}
@@ -308,17 +357,30 @@ def submit_appeal():
         return jsonify({'ok': False, 'msg': '联系方式不能超过100字'}), 400
     
     conn = get_db()
-    # 检查用户是否存在且被封禁或功能受限
-    user = conn.execute('SELECT id, banned, can_post, can_reply FROM users WHERE username=?', (username,)).fetchone()
+    # 检查用户是否存在且被封禁或功能受限（防御性查询：兼容旧数据库）
+    user = conn.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
     if not user:
         conn.close()
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
-    
+
+    # 安全读取 can_post / can_reply（旧数据库可能无此列）
+    _banned = user.get('banned') or 0
+    _can_post = 1
+    _can_reply = 1
+    try:
+        _can_post = user['can_post'] if user['can_post'] is not None else 1
+    except Exception:
+        pass
+    try:
+        _can_reply = user['can_reply'] if user['can_reply'] is not None else 1
+    except Exception:
+        pass
+
     # 判断申诉类型
     appeal_type = 'ban'
-    if user['banned']:
+    if _banned:
         appeal_type = 'ban'
-    elif user['can_post'] == 0 or user['can_reply'] == 0:
+    elif _can_post == 0 or _can_reply == 0:
         appeal_type = 'restrict'
     else:
         conn.close()
@@ -375,6 +437,9 @@ def process_appeal(aid):
     data = request.json or {}
     action = data.get('action')  # 'approve' or 'reject'
     reply = data.get('reply', '').strip()
+    # 功能限制申诉时，管理员可选择恢复哪些权限（1=恢复，0=不恢复）
+    restore_can_post = data.get('can_post', 1)  # 默认恢复
+    restore_can_reply = data.get('can_reply', 1)  # 默认恢复
     
     if action not in ['approve', 'reject']:
         return jsonify({'ok': False, 'msg': '无效的操作'}), 400
@@ -403,10 +468,10 @@ def process_appeal(aid):
     if action == 'approve':
         appeal_type = appeal['appeal_type'] if 'appeal_type' in appeal.keys() else 'ban'
         if appeal_type == 'restrict':
-            # 功能限制申诉：恢复所有功能权限
+            # 功能限制申诉：按管理员勾选的权限恢复
             conn.execute(
-                'UPDATE users SET can_post=1, can_reply=1 WHERE username=?',
-                (appeal['username'],)
+                'UPDATE users SET can_post=?, can_reply=? WHERE username=?',
+                (restore_can_post, restore_can_reply, appeal['username'])
             )
         else:
             # 封禁申诉：解封账号
@@ -425,13 +490,29 @@ def process_appeal(aid):
 def my_appeals():
     """当前用户查看自己的申诉记录与结果"""
     conn = get_db()
-    rows = conn.execute(
-        'SELECT id, reason, contact, status, admin_reply, appeal_type, created_at, processed_at '
-        'FROM appeals WHERE user_id=? ORDER BY created_at DESC LIMIT 5',
-        (session['user_id'],)
-    ).fetchall()
+    # 防御性查询：兼容旧数据库无 appeal_type 列的情况
+    try:
+        rows = conn.execute(
+            'SELECT id, reason, contact, status, admin_reply, appeal_type, created_at, processed_at '
+            'FROM appeals WHERE user_id=? ORDER BY created_at DESC LIMIT 5',
+            (session['user_id'],)
+        ).fetchall()
+    except Exception:
+        # 旧数据库缺少 appeal_type 列，回退查询
+        rows = conn.execute(
+            'SELECT id, reason, contact, status, admin_reply, created_at, processed_at '
+            'FROM appeals WHERE user_id=? ORDER BY created_at DESC LIMIT 5',
+            (session['user_id'],)
+        ).fetchall()
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    result = []
+    for r in rows:
+        d = dict(r)
+        # 兼容旧数据：缺少 appeal_type 时补默认值
+        if 'appeal_type' not in d or d.get('appeal_type') is None:
+            d['appeal_type'] = 'ban'
+        result.append(d)
+    return jsonify(result)
 
 @app.route('/api/stats', methods=['GET'])
 def public_stats():
