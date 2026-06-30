@@ -304,7 +304,7 @@ def check_user_status():
     if not user:
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
 
-    banned = user.get('banned') or 0
+    banned = user['banned'] if 'banned' in user.keys() else 0
     can_post = 1
     can_reply = 1
     try:
@@ -364,7 +364,7 @@ def submit_appeal():
         return jsonify({'ok': False, 'msg': '用户不存在'}), 404
 
     # 安全读取 can_post / can_reply（旧数据库可能无此列）
-    _banned = user.get('banned') or 0
+    _banned = user['banned'] if 'banned' in user.keys() else 0
     _can_post = 1
     _can_reply = 1
     try:
