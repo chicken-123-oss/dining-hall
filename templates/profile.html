@@ -236,6 +236,11 @@ async function init() {
   try {
     const r = await fetch('/api/me', { credentials: 'include' });
     const d = await r.json();
+    if (!d.ok && d.banned) {
+      alert('您的账号已被封禁，即将跳转至申诉页面。');
+      location.href = d.appeal_url || '/appeal';
+      return;
+    }
     if (d.ok) {
       me = d;
       document.getElementById('nav-user').style.display = '';

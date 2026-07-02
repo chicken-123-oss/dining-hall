@@ -249,16 +249,36 @@ def me():
     if 'user_id' not in session:
         return jsonify({'ok': False, 'msg': '未登录'}), 401
     conn = get_db()
+    u = conn.execute('SELECT * FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    conn.close()
+
+    # 用户已被删除
+    if not u:
+        session.clear()
+        return jsonify({'ok': False, 'msg': '账号不存在'}), 401
+
+    # 用户已被封禁：服务端主动清除 session，强制下线
+    banned = u['banned'] if 'banned' in u.keys() else 0
+    if banned:
+        session.clear()
+        return jsonify({
+            'ok': False,
+            'msg': '账号已被封禁',
+            'banned': True,
+            'appeal_url': f'/appeal?username={u["username"]}'
+        }), 403
+
     can_post = 1
     can_reply = 1
     try:
-        u = conn.execute('SELECT can_post, can_reply FROM users WHERE id=?', (session['user_id'],)).fetchone()
-        if u:
-            can_post = u['can_post'] if u['can_post'] is not None else 1
-            can_reply = u['can_reply'] if u['can_reply'] is not None else 1
+        can_post = u['can_post'] if u['can_post'] is not None else 1
     except Exception:
-        pass  # 数据库缺少 can_post/can_reply 列，使用默认值 1
-    conn.close()
+        pass
+    try:
+        can_reply = u['can_reply'] if u['can_reply'] is not None else 1
+    except Exception:
+        pass
+
     return jsonify({
         'ok': True,
         'id': session['user_id'],

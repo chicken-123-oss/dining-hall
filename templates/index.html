@@ -250,6 +250,12 @@ async function init(){
   try{
     const r=await fetch('/api/me',{credentials:'include'});
     const d=await r.json();
+    if(!d.ok && d.banned){
+      // 账号已封禁：服务端已清除 session，提示后跳往申诉页
+      alert('您的账号已被封禁，即将跳转至申诉页面。');
+      location.href=d.appeal_url||'/appeal';
+      return;
+    }
     if(d.ok){
       me=d;
       document.getElementById('nav-user').style.display='';
